@@ -1,0 +1,162 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply font-sans antialiased min-w-[320px] overflow-x-hidden;
+    @apply bg-dark-bg text-dark-text;
+  }
+  
+  html {
+    @apply dark;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-primary text-white px-4 py-2 rounded hover:bg-primary-hover 
+           transition-colors duration-300 disabled:opacity-50 disabled:cursor-not-allowed
+           font-medium;
+  }
+  
+  .btn-secondary {
+    @apply bg-dark-surface-elevated text-dark-text px-4 py-2 rounded hover:bg-dark-surface
+           border border-dark-border transition-colors duration-300 
+           disabled:opacity-50 disabled:cursor-not-allowed font-medium;
+  }
+
+  .input-field {
+    @apply w-full px-4 py-2 rounded border border-dark-border
+           bg-dark-bg text-dark-text placeholder-dark-text-muted
+           focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent
+           disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-300;
+  }
+
+  .modal-overlay {
+    @apply fixed inset-0 bg-black/50 flex justify-center items-center z-[99999];
+  }
+
+  .modal-content {
+    @apply bg-light-surface dark:bg-dark-surface p-md rounded-lg shadow-md 
+           max-h-[85vh] overflow-y-auto w-[90%] max-w-[500px]
+           dark:shadow-lg dark:shadow-black/30;
+  }
+
+  .review-modal .modal-content {
+    @apply max-w-[900px];
+  }
+}
+
+
+/* Base Styles */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* Dark theme is default - applied via Tailwind classes */
+
+
+/* Common Elements */
+button {
+  border-radius: var(--border-radius);
+  border: 1px solid transparent;
+  padding: clamp(0.4em, 1vw, 0.6em) clamp(0.8em, 2vw, 1.2em);
+  font-size: var(--font-size-base);
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.25s, background-color 0.25s;
+  min-height: 44px; /* iOS minimum touch target */
+}
+
+button:hover {
+  border-color: var(--primary-color);
+}
+
+button:focus,
+button:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+}
+
+/* iPad Pro 11-inch Optimizations */
+@media screen and (width: 834px) and (height: 1194px) {
+  :root {
+    --spacing-md: 1.25rem;
+    --font-size-base: 1.125rem;
+  }
+  
+  .container {
+    padding: var(--spacing-lg);
+  }
+}
+
+/* Form responsiveness */
+input,
+select,
+textarea {
+  max-width: 100%;
+  font-size: var(--font-size-base);
+  padding: var(--spacing-sm);
+}
+
+/* Table responsiveness */
+.table-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: 0 calc(-1 * var(--spacing-sm));
+  padding: 0 var(--spacing-sm);
+}
+
+/* Mobile breakpoint utilities */
+@media screen and (max-width: 480px) {
+  .hide-on-mobile {
+    display: none;
+  }
+  
+  .stack-on-mobile {
+    flex-direction: column;
+  }
+  
+  .full-width-on-mobile {
+    width: 100%;
+  }
+}
+
+/* Modal Base Styles */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 99999;
+}
+
+.modal-content {
+    background-color: var(--light-surface);
+    padding: var(--spacing-md);
+    border-radius: var(--border-radius);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    max-height: 85vh;
+    overflow-y: auto;
+    width: var(--modal-width);
+}
+
+.dark .modal-content {
+    background-color: var(--dark-surface);
+    color: var(--dark-text);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Review Modal Specific */
+.review-modal .modal-content {
+    width: var(--review-modal-width);
+}

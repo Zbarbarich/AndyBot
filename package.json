@@ -1,0 +1,30 @@
+{
+  "name": "the-nineteenth-chamber",
+  "version": "1.0.0",
+  "description": "Personal tech companies ticket/ERP system - The Nineteenth Chamber",
+  "scripts": {
+    "start": "concurrently \"npm run start:frontend\" \"npm run start:api-gateway\" \"npm run start:auth-service\"",
+    "start:frontend": "cd frontend && npm run dev",
+    "start:api-gateway": "cd backend/api-gateway && npm run dev",
+    "start:auth-service": "cd backend/auth-service && npm run dev",
+    "postinstall": "npm run install-all",
+    "install-all": "concurrently \"npm run install-frontend\" \"npm run install-auth\" \"npm run install-gateway\"",
+    "install-frontend": "cd frontend && npm install",
+    "install-auth": "cd backend/auth-service && npm install",
+    "install-gateway": "cd backend/api-gateway && npm install"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  },
+  "keywords": [
+    "erp",
+    "ticket-system",
+    "react",
+    "nodejs",
+    "express",
+    "typescript"
+  ],
+  "author": "Zach Barbarich",
+  "license": "UNLICENSED",
+  "private": true
+}

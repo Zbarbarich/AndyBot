@@ -1,0 +1,20 @@
+{
+  "name": "the-nineteenth-chamber-backend",
+  "version": "1.0.0",
+  "description": "Backend services for The Nineteenth Chamber",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:gateway\" \"npm run dev:auth\"",
+    "dev:gateway": "cd api-gateway && npm run dev",
+    "dev:auth": "cd auth-service && npm run dev",
+    "start": "concurrently \"npm run start:gateway\" \"npm run start:auth\"",
+    "start:gateway": "cd api-gateway && npm start",
+    "start:auth": "cd auth-service && npm start",
+    "install-all": "npm run install:gateway && npm run install:auth",
+    "install:gateway": "cd api-gateway && npm install",
+    "install:auth": "cd auth-service && npm install"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  },
+  "private": true
+}
