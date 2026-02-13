@@ -38,10 +38,10 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-dark-bg flex items-center justify-center p-md">
+    <div className="min-h-screen bg-dark-bg flex items-center justify-center p-4 sm:p-6 safe-area-pb">
       <div className="w-full max-w-md">
-        <div className="border border-dark-border rounded-lg p-8 bg-dark-surface">
-          <h1 className="text-2xl font-semibold mb-8 text-center text-dark-text">
+        <div className="border border-dark-border rounded-xl p-6 sm:p-8 bg-dark-surface shadow-xl">
+          <h1 className="text-xl sm:text-2xl font-semibold mb-6 sm:mb-8 text-center text-dark-text">
             The Nineteenth Chamber
           </h1>
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -53,7 +53,7 @@ const LoginPage = () => {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-2 bg-dark-bg border border-dark-border rounded text-dark-text placeholder-dark-text-muted focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-colors"
+                className="input-field"
                 placeholder="Enter your email"
                 required
               />
@@ -66,7 +66,7 @@ const LoginPage = () => {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-2 bg-dark-bg border border-dark-border rounded text-dark-text placeholder-dark-text-muted focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-colors"
+                className="input-field"
                 placeholder="Enter your password"
                 required
               />
@@ -76,7 +76,7 @@ const LoginPage = () => {
             )}
             <button
               type="submit"
-              className="w-full bg-primary hover:bg-primary-hover text-white font-medium py-2.5 px-4 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="btn-primary w-full"
               disabled={loading}
             >
               {loading ? 'Logging in...' : 'Login'}

@@ -9,7 +9,6 @@ const poolConfig: PoolConfig = {
   port: parseInt(process.env.DB_PORT || "5432"),
 };
 
-// Only use SSL if explicitly enabled (for production/remote databases)
 if (process.env.DB_SSL === "true") {
   poolConfig.ssl = {
     rejectUnauthorized: false,
@@ -18,10 +17,9 @@ if (process.env.DB_SSL === "true") {
 
 const pool = new Pool(poolConfig);
 
-// Connection test - log clear message if DB is unreachable
 pool.connect((err, client, release) => {
   if (err) {
-    console.error("Database connection failed. Check that PostgreSQL is running and .env has correct DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD.");
+    console.error("App-service DB connection failed. Check PostgreSQL and .env (DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD).");
     if (err.message) console.error(err.message);
     return;
   }
@@ -35,10 +33,9 @@ pool.connect((err, client, release) => {
       console.error("Database query failed:", err.message);
       return;
     }
-    console.log("Connected to database successfully");
+    console.log("App-service connected to database");
   });
 });
 
-// Export the query interface
-export const query = (text: string, params?: any[]) => pool.query(text, params);
+export const query = (text: string, params?: unknown[]) => pool.query(text, params);
 export { pool };

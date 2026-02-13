@@ -15,36 +15,68 @@
 
 @layer components {
   .btn-primary {
-    @apply bg-primary text-white px-4 py-2 rounded hover:bg-primary-hover 
+    @apply bg-primary text-white px-4 py-2.5 rounded-lg hover:bg-primary-hover
            transition-colors duration-300 disabled:opacity-50 disabled:cursor-not-allowed
-           font-medium;
+           font-medium min-h-[44px] inline-flex items-center justify-center;
   }
-  
+
   .btn-secondary {
-    @apply bg-dark-surface-elevated text-dark-text px-4 py-2 rounded hover:bg-dark-surface
-           border border-dark-border transition-colors duration-300 
-           disabled:opacity-50 disabled:cursor-not-allowed font-medium;
+    @apply bg-dark-surface-elevated text-dark-text px-4 py-2.5 rounded-lg hover:bg-dark-surface
+           border border-dark-border transition-colors duration-300
+           disabled:opacity-50 disabled:cursor-not-allowed font-medium min-h-[44px] inline-flex items-center justify-center;
   }
 
   .input-field {
-    @apply w-full px-4 py-2 rounded border border-dark-border
-           bg-dark-bg text-dark-text placeholder-dark-text-muted
+    @apply w-full px-4 py-3 rounded-lg border border-dark-border min-h-[44px]
+           bg-dark-bg text-dark-text placeholder-dark-text-muted text-base
            focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent
            disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-300;
   }
 
+  /* Responsive page container */
+  .page-container {
+    @apply max-w-container mx-auto px-4 sm:px-6 py-6 sm:py-8 lg:py-10;
+  }
+
+  /* Tables: horizontal scroll on small screens, touch-friendly */
+  .table-scroll {
+    @apply overflow-x-auto rounded-lg border border-dark-border bg-dark-surface;
+    -webkit-overflow-scrolling: touch;
+  }
+  .table-scroll table {
+    @apply w-full text-left min-w-[640px];
+  }
+  .table-scroll th,
+  .table-scroll td {
+    @apply p-3 sm:p-4 text-sm sm:text-base;
+  }
+  .table-scroll th {
+    @apply bg-dark-surface-elevated border-b border-dark-border text-dark-text-muted font-medium whitespace-nowrap;
+  }
+  .table-scroll tbody tr {
+    @apply border-b border-dark-border last:border-0;
+  }
+
   .modal-overlay {
-    @apply fixed inset-0 bg-black/50 flex justify-center items-center z-[99999];
+    @apply fixed inset-0 bg-black/50 flex justify-center items-end sm:items-center z-[99999] p-0 sm:p-4;
   }
 
   .modal-content {
-    @apply bg-light-surface dark:bg-dark-surface p-md rounded-lg shadow-md 
-           max-h-[85vh] overflow-y-auto w-[90%] max-w-[500px]
-           dark:shadow-lg dark:shadow-black/30;
+    @apply bg-dark-surface p-4 sm:p-6 rounded-t-2xl sm:rounded-lg shadow-xl
+           max-h-[90vh] overflow-y-auto w-full sm:max-w-[500px] sm:w-[90%]
+           border border-dark-border border-b-0 sm:border-b;
   }
 
   .review-modal .modal-content {
-    @apply max-w-[900px];
+    @apply sm:max-w-[900px];
+  }
+
+  /* Safe area for notched devices */
+  .safe-area-pb {
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+  .safe-area-pt {
+    padding-top: env(safe-area-inset-top, 0);
   }
 }
 
@@ -59,17 +91,24 @@
 /* Dark theme is default - applied via Tailwind classes */
 
 
-/* Common Elements */
+/* Common Elements - touch-friendly */
 button {
   border-radius: var(--border-radius);
   border: 1px solid transparent;
-  padding: clamp(0.4em, 1vw, 0.6em) clamp(0.8em, 2vw, 1.2em);
+  padding: 0.5rem 0.75rem;
   font-size: var(--font-size-base);
   font-weight: 500;
   font-family: inherit;
   cursor: pointer;
   transition: border-color 0.25s, background-color 0.25s;
-  min-height: 44px; /* iOS minimum touch target */
+  min-height: 44px;
+  min-width: 44px;
+}
+@media (min-width: 640px) {
+  button {
+    padding: clamp(0.4em, 1vw, 0.6em) clamp(0.8em, 2vw, 1.2em);
+    min-width: 0;
+  }
 }
 
 button:hover {

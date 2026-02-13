@@ -3,15 +3,18 @@
   "version": "1.0.0",
   "description": "Backend services for The Nineteenth Chamber",
   "scripts": {
-    "dev": "concurrently \"npm run dev:gateway\" \"npm run dev:auth\"",
+    "dev": "concurrently \"npm run dev:gateway\" \"npm run dev:auth\" \"npm run dev:app\"",
     "dev:gateway": "cd api-gateway && npm run dev",
     "dev:auth": "cd auth-service && npm run dev",
-    "start": "concurrently \"npm run start:gateway\" \"npm run start:auth\"",
+    "start": "concurrently \"npm run start:gateway\" \"npm run start:auth\" \"npm run start:app\"",
     "start:gateway": "cd api-gateway && npm start",
     "start:auth": "cd auth-service && npm start",
-    "install-all": "npm run install:gateway && npm run install:auth",
+    "install-all": "npm run install:gateway && npm run install:auth && npm run install:app",
     "install:gateway": "cd api-gateway && npm install",
-    "install:auth": "cd auth-service && npm install"
+    "install:auth": "cd auth-service && npm install",
+    "dev:app": "cd app-service && npm run dev",
+    "start:app": "cd app-service && npm start",
+    "install:app": "cd app-service && npm install"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"
