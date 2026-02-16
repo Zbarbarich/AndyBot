@@ -1,0 +1,18 @@
+# Auth Service Environment Variables
+
+# Server Configuration
+PORT=3001
+
+# Database Configuration
+DB_HOST=localhost
+DB_PORT=5419
+DB_NAME=TheNineteenthChamber
+DB_USER=postgres
+DB_PASSWORD=postgres
+DB_SSL=false
+
+# JWT Configuration
+JWT_SECRET=the-nineteenth-chamber-jwt-secret-key-change-in-production-2026
+
+# Environment
+NODE_ENV=development

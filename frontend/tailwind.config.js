@@ -48,9 +48,15 @@ module.exports = {
       },
       maxWidth: {
         container: 'min(1280px, 95vw)',
+        'container-xl': 'min(1536px, 92vw)',
         modal: 'min(400px, 95vw)',
         'review-modal': 'min(900px, 95vw)',
         form: 'min(600px, 95vw)',
+      },
+      screens: {
+        ...defaultTheme.screens,
+        xl: '1280px',
+        '2xl': '1536px',
       },
       borderRadius: {
         DEFAULT: 'clamp(4px, 1vw, 8px)',

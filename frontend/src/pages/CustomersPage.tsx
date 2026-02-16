@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import NavigationBar from '../components/NavigationBar';
 
 const API_BASE = 'http://localhost:3000/api/app/customers';
 
@@ -127,9 +126,7 @@ const CustomersPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-dark-bg flex flex-col">
-      <NavigationBar />
-      <main className="flex-1 page-container">
+    <div className="page-container">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
           <h1 className="text-2xl sm:text-3xl font-bold text-dark-text">Customers</h1>
           <button
@@ -223,13 +220,13 @@ const CustomersPage = () => {
             <table>
               <thead>
                 <tr>
-                  <th>ID</th>
+                  <th className="col-id">ID</th>
                   <th>Name</th>
                   <th>Email</th>
                   <th>Phone</th>
-                  <th>Ticket #s</th>
-                  <th>Email notif.</th>
-                  <th>Text notif.</th>
+                  <th className="col-status">Ticket #s</th>
+                  <th className="col-status">Email notif.</th>
+                  <th className="col-status">Text notif.</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -240,7 +237,7 @@ const CustomersPage = () => {
                     className="cursor-pointer hover:bg-dark-surface-elevated/50 active:bg-dark-surface-elevated/70"
                     onClick={() => navigate(`/customers/${c.id}`)}
                   >
-                    <td>{c.id}</td>
+                    <td className="col-id font-mono">{c.id}</td>
                     <td className="font-medium">{c.name}</td>
                     <td>{c.email ?? '—'}</td>
                     <td>{c.phone ?? '—'}</td>
@@ -262,7 +259,6 @@ const CustomersPage = () => {
             )}
           </div>
         )}
-      </main>
     </div>
   );
 };

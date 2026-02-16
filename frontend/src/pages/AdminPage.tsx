@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import NavigationBar from '../components/NavigationBar';
 
 const AUTH_BASE = 'http://localhost:3000/api/auth';
 
@@ -90,9 +89,7 @@ const AdminPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-dark-bg flex flex-col">
-      <NavigationBar />
-      <main className="flex-1 page-container">
+    <div className="page-container">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
           <h1 className="text-2xl sm:text-3xl font-bold text-dark-text">Admin – Users</h1>
           <button
@@ -113,8 +110,9 @@ const AdminPage = () => {
         {showCreate && (
           <div className="mb-6 sm:mb-8 p-4 sm:p-6 rounded-xl bg-dark-surface border border-dark-border max-w-md w-full">
             <h2 className="text-lg sm:text-xl font-semibold text-dark-text mb-4">Create User</h2>
-            <form onSubmit={handleCreateUser} className="space-y-4">
-              <div>
+            <form onSubmit={handleCreateUser} className="space-y-4 max-w-md">
+              <div className="detail-grid gap-4">
+              <div className="sm:col-span-2">
                 <label className="block text-sm font-medium text-dark-text-muted mb-1">User name *</label>
                 <input
                   type="text"
@@ -124,7 +122,7 @@ const AdminPage = () => {
                   required
                 />
               </div>
-              <div>
+              <div className="sm:col-span-2">
                 <label className="block text-sm font-medium text-dark-text-muted mb-1">Email *</label>
                 <input
                   type="email"
@@ -134,7 +132,7 @@ const AdminPage = () => {
                   required
                 />
               </div>
-              <div>
+              <div className="sm:col-span-2">
                 <label className="block text-sm font-medium text-dark-text-muted mb-1">Password *</label>
                 <input
                   type="password"
@@ -149,11 +147,12 @@ const AdminPage = () => {
                 <select
                   value={createForm.role}
                   onChange={(e) => setCreateForm((f) => ({ ...f, role: e.target.value }))}
-                  className="input-field"
+                  className="input-field max-w-[120px]"
                 >
                   <option value="admin">Admin</option>
                   <option value="tech">Tech</option>
                 </select>
+              </div>
               </div>
               <div className="flex flex-wrap gap-2">
                 <button type="submit" className="btn-primary">Create</button>
@@ -170,20 +169,20 @@ const AdminPage = () => {
             <table>
               <thead>
                 <tr>
-                  <th>ID</th>
+                  <th className="col-id">ID</th>
                   <th>User name</th>
                   <th>Email</th>
-                  <th>Role</th>
+                  <th className="col-status">Role</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody className="text-dark-text">
                 {users.map((u) => (
                   <tr key={u.userID}>
-                    <td>{u.userID}</td>
+                    <td className="col-id font-mono">{u.userID}</td>
                     <td className="font-medium">{u.userName}</td>
                     <td>{u.email}</td>
-                    <td>{u.role}</td>
+                    <td className="col-status">{u.role}</td>
                     <td>
                       <button
                         type="button"
@@ -202,7 +201,6 @@ const AdminPage = () => {
             )}
           </div>
         )}
-      </main>
     </div>
   );
 };
