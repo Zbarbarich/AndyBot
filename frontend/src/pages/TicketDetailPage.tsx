@@ -1,6 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import NavigationBar from '../components/NavigationBar';
 
 const TICKETS_API = 'http://localhost:3000/api/app/tickets';
 const CUSTOMERS_API = 'http://localhost:3000/api/app/customers';
@@ -9,6 +8,13 @@ interface ResolutionUpdate {
   id: number;
   ticket_id: number;
   content: string;
+  created_at: string;
+}
+
+interface TicketImage {
+  id: number;
+  ticket_id: number;
+  position: number;
   created_at: string;
 }
 
@@ -26,6 +32,7 @@ interface Ticket {
   status: string;
   created_at: string;
   updated_at: string;
+  images?: TicketImage[];
   resolution_updates?: ResolutionUpdate[];
 }
 
@@ -51,8 +58,13 @@ const TicketDetailPage = () => {
   const [showCloseModal, setShowCloseModal] = useState(false);
   const [finalResolution, setFinalResolution] = useState('');
   const [closing, setClosing] = useState(false);
+  const [imageUrls, setImageUrls] = useState<Record<number, string>>({});
+  const [addingImage, setAddingImage] = useState(false);
+  const [deletingImageId, setDeletingImageId] = useState<number | null>(null);
 
   const getToken = () => localStorage.getItem('token');
+
+  const MAX_IMAGES = 5;
 
   const fetchTicket = async () => {
     if (!id) return null;
@@ -171,35 +183,132 @@ const TicketDetailPage = () => {
 
   const isClosed = ticket?.status === 'Closed';
 
+  // Load image blobs and create object URLs for display
+  const imageUrlsCreatedRef = useRef<string[]>([]);
+  useEffect(() => {
+    if (!ticket?.images?.length) {
+      setImageUrls({});
+      imageUrlsCreatedRef.current = [];
+      return () => {};
+    }
+    const token = getToken();
+    let cancelled = false;
+    ticket.images.forEach((img) => {
+      fetch(`${TICKETS_API}/${ticket.id}/images/${img.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then((res) => (res.ok ? res.blob() : null))
+        .then((blob) => {
+          if (cancelled || !blob) return;
+          const url = URL.createObjectURL(blob);
+          imageUrlsCreatedRef.current.push(url);
+          setImageUrls((prev) => ({ ...prev, [img.id]: url }));
+        })
+        .catch(() => {});
+    });
+    return () => {
+      cancelled = true;
+      imageUrlsCreatedRef.current.forEach(URL.revokeObjectURL);
+      imageUrlsCreatedRef.current = [];
+    };
+  }, [ticket?.id, ticket?.images]);
+
+  const fileToBase64 = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        const base64 = result.includes(',') ? result.split(',')[1] : result;
+        resolve(base64 || '');
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+  const handleAddImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!ticket || !file || !file.type.startsWith('image/')) return;
+    const count = (ticket.images?.length ?? 0);
+    if (count >= MAX_IMAGES) {
+      setError(`Maximum ${MAX_IMAGES} images per ticket`);
+      return;
+    }
+    setAddingImage(true);
+    setError('');
+    try {
+      const base64 = await fileToBase64(file);
+      const res = await fetch(`${TICKETS_API}/${ticket.id}/images`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${getToken()}`,
+        },
+        body: JSON.stringify({ data: base64, encoding: 'base64' }),
+      });
+      if (!res.ok) throw new Error('Failed to add image');
+      const added = await res.json();
+      setTicket((prev) =>
+        prev
+          ? { ...prev, images: [...(prev.images || []), added].sort((a, b) => a.position - b.position) }
+          : null
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to add image');
+    } finally {
+      setAddingImage(false);
+    }
+  };
+
+  const handleDeleteImage = async (imageId: number) => {
+    if (!ticket) return;
+    setDeletingImageId(imageId);
+    setError('');
+    try {
+      const res = await fetch(`${TICKETS_API}/${ticket.id}/images/${imageId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      if (!res.ok) throw new Error('Failed to delete image');
+      if (imageUrls[imageId]) {
+        URL.revokeObjectURL(imageUrls[imageId]);
+        setImageUrls((prev) => {
+          const next = { ...prev };
+          delete next[imageId];
+          return next;
+        });
+      }
+      setTicket((prev) =>
+        prev ? { ...prev, images: (prev.images || []).filter((i) => i.id !== imageId) } : null
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete image');
+    } finally {
+      setDeletingImageId(null);
+    }
+  };
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-dark-bg flex flex-col">
-        <NavigationBar />
-        <main className="flex-1 page-container">
-          <p className="text-dark-text-muted py-8">Loading...</p>
-        </main>
+      <div className="page-container">
+        <p className="text-dark-text-muted py-8">Loading...</p>
       </div>
     );
   }
 
   if (error && !ticket) {
     return (
-      <div className="min-h-screen bg-dark-bg flex flex-col">
-        <NavigationBar />
-        <main className="flex-1 page-container">
+      <div className="page-container">
           <div className="p-4 rounded-lg bg-red-900/30 border border-red-700 text-red-300 text-sm sm:text-base">{error}</div>
           <button type="button" onClick={() => navigate('/tickets')} className="btn-secondary mt-4 w-full sm:w-auto">Back to Tickets</button>
-        </main>
-      </div>
+        </div>
     );
   }
 
   if (!ticket) return null;
 
   return (
-    <div className="min-h-screen bg-dark-bg flex flex-col">
-      <NavigationBar />
-      <main className="flex-1 page-container">
+    <div className="page-container">
         <button type="button" onClick={() => navigate('/tickets')} className="btn-secondary mb-6 w-full sm:w-auto">
           Back to Tickets
         </button>
@@ -255,26 +364,30 @@ const TicketDetailPage = () => {
             {/* Ticket details card */}
             <div className="rounded-xl bg-dark-surface border border-dark-border p-4 sm:p-6">
               <h2 className="text-lg font-semibold text-dark-text mb-4">Ticket</h2>
-              <dl className="space-y-2 text-sm text-dark-text">
-                <div>
-                  <dt className="text-dark-text-muted">Subject</dt>
-                  <dd className="font-medium">{ticket.subject}</dd>
+              <dl className="compact-grid text-sm text-dark-text">
+                <div className="short-field">
+                  <dt className="text-dark-text-muted text-xs">ID</dt>
+                  <dd className="font-mono">{ticket.id}</dd>
                 </div>
-                <div>
-                  <dt className="text-dark-text-muted">Created</dt>
-                  <dd>{new Date(ticket.creation_date).toLocaleString()}</dd>
+                <div className="short-field">
+                  <dt className="text-dark-text-muted text-xs">Status</dt>
+                  <dd className="font-medium">{ticket.status}</dd>
                 </div>
-                <div>
-                  <dt className="text-dark-text-muted">Category</dt>
-                  <dd>{ticket.category ?? '—'}</dd>
-                </div>
-                <div>
-                  <dt className="text-dark-text-muted">Priority</dt>
+                <div className="short-field">
+                  <dt className="text-dark-text-muted text-xs">Priority</dt>
                   <dd>{ticket.priority}</dd>
                 </div>
-                <div>
-                  <dt className="text-dark-text-muted">Status</dt>
-                  <dd className="font-medium">{ticket.status}</dd>
+                <div className="short-field">
+                  <dt className="text-dark-text-muted text-xs">Created</dt>
+                  <dd className="whitespace-nowrap">{new Date(ticket.creation_date).toLocaleString()}</dd>
+                </div>
+                <div className="short-field">
+                  <dt className="text-dark-text-muted text-xs">Category</dt>
+                  <dd>{ticket.category ?? '—'}</dd>
+                </div>
+                <div className="col-span-full sm:col-span-2 md:col-span-3 lg:col-span-6">
+                  <dt className="text-dark-text-muted text-xs">Subject</dt>
+                  <dd className="font-medium">{ticket.subject}</dd>
                 </div>
               </dl>
             </div>
@@ -285,6 +398,51 @@ const TicketDetailPage = () => {
             <div className="rounded-xl bg-dark-surface border border-dark-border p-4 sm:p-6">
               <h2 className="text-lg font-semibold text-dark-text mb-2">Description</h2>
               <p className="text-dark-text whitespace-pre-wrap text-sm sm:text-base">{ticket.description || '—'}</p>
+            </div>
+
+            {/* Ticket images (blobs from PostgreSQL) */}
+            <div className="rounded-xl bg-dark-surface border border-dark-border p-4 sm:p-6">
+              <h2 className="text-lg font-semibold text-dark-text mb-4">Photos ({ticket.images?.length ?? 0}/{MAX_IMAGES})</h2>
+              <div className="flex flex-wrap gap-4">
+                {(ticket.images || []).map((img) => (
+                  <div key={img.id} className="relative group">
+                    <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-lg border border-dark-border overflow-hidden bg-dark-bg flex items-center justify-center">
+                      {imageUrls[img.id] ? (
+                        <img
+                          src={imageUrls[img.id]}
+                          alt={`Ticket image ${img.position}`}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <span className="text-dark-text-muted text-xs">Loading…</span>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteImage(img.id)}
+                      disabled={deletingImageId === img.id}
+                      className="absolute top-1 right-1 rounded bg-red-600/90 text-white text-xs px-2 py-1 min-h-0 hover:bg-red-600 disabled:opacity-50"
+                      aria-label="Delete photo"
+                    >
+                      {deletingImageId === img.id ? '…' : 'Delete'}
+                    </button>
+                  </div>
+                ))}
+                {(ticket.images?.length ?? 0) < MAX_IMAGES && (
+                  <label className="w-24 h-24 sm:w-28 sm:h-28 rounded-lg border border-dashed border-dark-border flex items-center justify-center cursor-pointer hover:bg-dark-surface-elevated/50 transition-colors">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="sr-only"
+                      onChange={handleAddImage}
+                      disabled={addingImage}
+                    />
+                    <span className="text-dark-text-muted text-sm text-center px-2">
+                      {addingImage ? 'Adding…' : '+ Add photo'}
+                    </span>
+                  </label>
+                )}
+              </div>
             </div>
 
             <div className="rounded-xl bg-dark-surface border border-dark-border p-4 sm:p-6">
@@ -384,7 +542,6 @@ const TicketDetailPage = () => {
           </div>
         </div>
       )}
-      </main>
     </div>
   );
 };

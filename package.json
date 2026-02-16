@@ -3,31 +3,32 @@
   "version": "1.0.0",
   "description": "Personal tech companies ticket/ERP system - The Nineteenth Chamber",
   "scripts": {
-    "start": "concurrently \"npm run start:frontend\" \"npm run start:api-gateway\" \"npm run start:auth-service\" \"npm run start:app-service\"",
+    "start": "concurrently \"npm run start:frontend\" \"npm run start:api-gateway\" \"npm run start:auth-service\" \"npm run start:customer-service\" \"npm run start:ticket-service\" \"npm run start:order-service\" \"npm run start:invoice-service\" \"npm run start:pdf-service\"",
     "dev": "npm start",
     "start:frontend": "cd frontend && npm run dev",
     "start:api-gateway": "cd backend/api-gateway && npm run dev",
     "start:auth-service": "cd backend/auth-service && npm run dev",
-    "start:app-service": "cd backend/app-service && npm run dev",
+    "start:customer-service": "cd backend/customer-service && npm run dev",
+    "start:ticket-service": "cd backend/ticket-service && npm run dev",
+    "start:order-service": "cd backend/order-service && npm run dev",
+    "start:invoice-service": "cd backend/invoice-service && npm run dev",
+    "start:pdf-service": "cd backend/pdf-service && npm run dev",
     "postinstall": "npm run install-all",
-    "install-all": "concurrently \"npm run install-frontend\" \"npm run install-auth\" \"npm run install-gateway\" \"npm run install-app\"",
+    "install-all": "concurrently \"npm run install-frontend\" \"npm run install-auth\" \"npm run install-gateway\" \"npm run install-customer\" \"npm run install-ticket\" \"npm run install-order\" \"npm run install-invoice\" \"npm run install-pdf\"",
     "install-frontend": "cd frontend && npm install",
     "install-auth": "cd backend/auth-service && npm install",
     "install-gateway": "cd backend/api-gateway && npm install",
-    "install-app": "cd backend/app-service && npm install"
+    "install-customer": "cd backend/customer-service && npm install",
+    "install-ticket": "cd backend/ticket-service && npm install",
+    "install-order": "cd backend/order-service && npm install",
+    "install-invoice": "cd backend/invoice-service && npm install",
+    "install-pdf": "cd backend/pdf-service && npm install"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",
     "nodemon": "^3.1.0"
   },
-  "keywords": [
-    "erp",
-    "ticket-system",
-    "react",
-    "nodejs",
-    "express",
-    "typescript"
-  ],
+  "keywords": ["erp", "ticket-system", "react", "nodejs", "express", "typescript"],
   "author": "Zach Barbarich",
   "license": "UNLICENSED",
   "private": true

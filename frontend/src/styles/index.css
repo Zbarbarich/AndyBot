@@ -33,9 +33,48 @@
            disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-300;
   }
 
-  /* Responsive page container */
+  /* Responsive page container - wider on xl/2xl, use more screen space */
   .page-container {
-    @apply max-w-container mx-auto px-4 sm:px-6 py-6 sm:py-8 lg:py-10;
+    @apply max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 lg:py-10;
+  }
+
+  /* Grid layout for detail pages - responsive multi-column */
+  .detail-grid {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4;
+  }
+
+  /* Compact grid for short fields (ID, status, date) - denser row */
+  .compact-grid {
+    @apply grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 sm:gap-3;
+  }
+
+  /* Compact field row - label/value pairs for short fields */
+  .compact-field {
+    @apply text-sm;
+  }
+
+  /* Short fields: dates, amounts, status, IDs - constrained width */
+  .short-field {
+    @apply max-w-[7rem] w-24;
+  }
+  .short-field-amount {
+    @apply max-w-[7rem] w-28 font-mono;
+  }
+
+  /* Data grid for list/card layouts - use horizontal space */
+  .data-grid {
+    @apply grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4;
+  }
+
+  /* Centered page header for document pages (Quote, Order, Invoice) */
+  .page-header {
+    @apply text-center mb-6 sm:mb-8;
+  }
+  .page-header-title {
+    @apply text-2xl sm:text-3xl font-bold text-dark-text;
+  }
+  .page-header-back {
+    @apply mt-2 text-sm text-dark-text-muted hover:text-primary transition-colors inline-flex items-center gap-1;
   }
 
   /* Tables: horizontal scroll on small screens, touch-friendly */
@@ -48,8 +87,12 @@
   }
   .table-scroll th,
   .table-scroll td {
-    @apply p-3 sm:p-4 text-sm sm:text-base;
+    @apply p-2 sm:p-3 text-sm;
   }
+  .table-scroll .col-id { width: 4rem; max-width: 4rem; }
+  .table-scroll .col-date { width: 6rem; max-width: 6rem; }
+  .table-scroll .col-status { width: 5rem; max-width: 6rem; }
+  .table-scroll .col-amount { width: 5.5rem; max-width: 6rem; font-variant-numeric: tabular-nums; }
   .table-scroll th {
     @apply bg-dark-surface-elevated border-b border-dark-border text-dark-text-muted font-medium whitespace-nowrap;
   }

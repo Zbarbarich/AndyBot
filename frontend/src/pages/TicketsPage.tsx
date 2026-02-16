@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import NavigationBar from '../components/NavigationBar';
 
 const API_BASE = 'http://localhost:3000/api/app/tickets';
 const CUSTOMERS_API = 'http://localhost:3000/api/app/customers';
@@ -170,9 +169,7 @@ const TicketsPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-dark-bg flex flex-col">
-      <NavigationBar />
-      <main className="flex-1 page-container">
+    <div className="page-container">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
           <h1 className="text-2xl sm:text-3xl font-bold text-dark-text">Tickets</h1>
           <button
@@ -284,13 +281,13 @@ const TicketsPage = () => {
             <table>
               <thead>
                 <tr>
-                  <th>ID</th>
-                  <th>Created</th>
+                  <th className="col-id">ID</th>
+                  <th className="col-date">Created</th>
                   <th>Subject</th>
                   <th>Customer</th>
-                  <th>Category</th>
-                  <th>Priority</th>
-                  <th>Status</th>
+                  <th className="col-status">Category</th>
+                  <th className="col-id">Prio</th>
+                  <th className="col-status">Status</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -301,13 +298,13 @@ const TicketsPage = () => {
                     className="cursor-pointer hover:bg-dark-surface-elevated/50 active:bg-dark-surface-elevated/70"
                     onClick={() => navigate(`/tickets/${t.id}`)}
                   >
-                    <td>{t.id}</td>
-                    <td className="whitespace-nowrap">{new Date(t.creation_date).toLocaleDateString()}</td>
+                    <td className="col-id font-mono">{t.id}</td>
+                    <td className="col-date whitespace-nowrap">{new Date(t.creation_date).toLocaleDateString()}</td>
                     <td className="font-medium max-w-[200px] truncate sm:max-w-none sm:truncate-none">{t.subject}</td>
                     <td>{t.customer_name ?? (t.email ?? '—')}</td>
                     <td>{t.category ?? '—'}</td>
-                    <td>{t.priority}</td>
-                    <td>{t.status ?? 'Open'}</td>
+                    <td className="col-id">{t.priority}</td>
+                    <td className="col-status">{t.status ?? 'Open'}</td>
                     <td className="whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                       <span className="flex flex-wrap gap-1 sm:gap-2">
                         <button type="button" onClick={() => startEdit(t)} className="btn-secondary text-sm py-1.5 px-2 sm:px-3 min-h-[36px]">Edit</button>
@@ -323,7 +320,6 @@ const TicketsPage = () => {
             )}
           </div>
         )}
-      </main>
     </div>
   );
 };

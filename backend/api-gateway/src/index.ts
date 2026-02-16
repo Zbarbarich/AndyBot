@@ -15,7 +15,6 @@ const PORT = process.env.PORT || 3000;
 
 // Verify environment variables are loaded
 console.log("Auth Service URL:", process.env.AUTH_SERVICE_URL);
-console.log("App Service URL:", process.env.APP_SERVICE_URL);
 
 // Configure CORS
 app.use(
@@ -29,7 +28,7 @@ app.use(
       "http://localhost:3001",
       "http://localhost:3002",
     ],
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "Accept"],
     credentials: true,
   })
