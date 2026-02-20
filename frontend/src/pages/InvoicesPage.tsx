@@ -1,7 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Plus } from 'lucide-react';
+import { useListFetch } from '../hooks/useListFetch';
+import { ErrorBanner } from '../components/ErrorBanner';
 
 const API_BASE = 'http://localhost:3000/api/app/invoices';
+
+type StatusFilter = 'open' | 'closed' | 'all';
 
 interface InvoiceSummary {
   id: number;
@@ -10,121 +15,87 @@ interface InvoiceSummary {
   order_document_number: string;
   customer_name: string;
   total: number;
-  status: string;
+  amount_paid?: number | null;
   invoice_date: string;
   created_at: string;
 }
 
 const InvoicesPage = () => {
   const navigate = useNavigate();
-  const [invoices, setInvoices] = useState<InvoiceSummary[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [pdfLoadingId, setPdfLoadingId] = useState<number | null>(null);
-
-  const getToken = () => localStorage.getItem('token');
-
-  const handleDownloadPdf = async (id: number, invoiceNumber: string) => {
-    setPdfLoadingId(id);
-    setError('');
-    try {
-      const res = await fetch(`${API_BASE}/${id}/pdf`, { headers: { Authorization: `Bearer ${getToken()}` } });
-      if (!res.ok) throw new Error('Failed to download PDF');
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `invoice-${invoiceNumber}.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to download PDF');
-    } finally {
-      setPdfLoadingId(null);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('open');
+  const [customerFilter, setCustomerFilter] = useState('');
+  const { data: allInvoices, loading, error } = useListFetch<InvoiceSummary>(API_BASE);
+  const invoices = useMemo(() => {
+    let list = allInvoices;
+    if (statusFilter === 'open') list = list.filter((inv) => Number(inv.amount_paid ?? 0) < Number(inv.total));
+    if (statusFilter === 'closed') list = list.filter((inv) => Number(inv.amount_paid ?? 0) >= Number(inv.total));
+    if (customerFilter.trim()) {
+      const q = customerFilter.trim().toLowerCase();
+      list = list.filter((inv) => (inv.customer_name ?? '').toLowerCase().includes(q));
     }
-  };
-
-  const fetchInvoices = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const res = await fetch(API_BASE, {
-        headers: { Authorization: `Bearer ${getToken()}` },
-      });
-      if (!res.ok) throw new Error(res.status === 401 ? 'Unauthorized' : 'Failed to fetch');
-      const data = await res.json();
-      setInvoices(data);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load invoices');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchInvoices();
-  }, []);
+    return list;
+  }, [allInvoices, statusFilter, customerFilter]);
 
   return (
     <div className="page-container">
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
-          <h1 className="text-2xl sm:text-3xl font-bold text-dark-text">Invoices</h1>
-        </div>
+      <ErrorBanner message={error} />
 
-        {error && (
-          <div className="mb-4 p-4 rounded-lg bg-red-900/30 border border-red-700 text-red-300 text-sm sm:text-base">
-            {error}
-          </div>
-        )}
+      <div className="flex flex-wrap items-center gap-1.5 mb-2">
+        {(['open', 'closed', 'all'] as const).map((tab) => (
+          <button
+            key={tab}
+            type="button"
+            onClick={() => setStatusFilter(tab)}
+            className={`pill-button ${statusFilter === tab ? 'active' : ''}`}
+          >
+            {tab === 'open' ? 'Unpaid' : tab === 'closed' ? 'Paid' : tab}
+          </button>
+        ))}
+        <input
+          type="text"
+          value={customerFilter}
+          onChange={(e) => setCustomerFilter(e.target.value)}
+          placeholder="Customer..."
+          className="filter-search-input"
+          aria-label="Filter by customer"
+        />
+        <button
+          type="button"
+          onClick={() => navigate('/invoices/bill-order')}
+          className="btn-icon-primary ml-auto"
+          aria-label="Bill an order"
+        >
+          <Plus className="w-5 h-5" />
+        </button>
+      </div>
 
+      <div className="rounded-lg border border-dark-border bg-dark-surface overflow-hidden">
         {loading ? (
-          <p className="text-dark-text-muted py-8">Loading...</p>
+          <p className="text-dark-text-muted py-8 px-4">Loading...</p>
         ) : (
-          <div className="table-scroll">
+          <div className="table-scroll table-scroll-fit">
             <table>
               <thead>
                 <tr>
-                  <th>Invoice #</th>
-                  <th>Order #</th>
-                  <th>Customer</th>
+                  <th className="col-doc">Invoice #</th>
+                  <th className="col-doc">Order #</th>
+                  <th className="col-customer">Customer</th>
                   <th className="col-amount">Total</th>
-                  <th className="col-status">Status</th>
-                  <th className="col-date">Invoice date</th>
-                  <th>Actions</th>
+                  <th className="col-date">Date</th>
                 </tr>
               </thead>
               <tbody className="text-dark-text">
                 {invoices.map((inv) => (
                   <tr
                     key={inv.id}
-                    className="cursor-pointer hover:bg-dark-surface-elevated/50"
+                    className="cursor-pointer hover:bg-dark-surface-elevated/50 active:bg-dark-surface-elevated/70"
                     onClick={() => navigate(`/invoices/${inv.id}`)}
                   >
-                    <td className="font-mono font-medium">{inv.invoice_number}</td>
-                    <td className="font-mono">{inv.order_document_number}</td>
-                    <td>{inv.customer_name}</td>
+                    <td className="col-doc font-mono font-medium truncate" title={inv.invoice_number}>{inv.invoice_number}</td>
+                    <td className="col-doc font-mono truncate" title={inv.order_document_number}>{inv.order_document_number}</td>
+                    <td className="col-customer truncate" title={inv.customer_name}>{inv.customer_name}</td>
                     <td className="col-amount whitespace-nowrap">{Number(inv.total).toFixed(2)}</td>
-                    <td className="col-status">{inv.status}</td>
                     <td className="col-date whitespace-nowrap">{inv.invoice_date}</td>
-                    <td onClick={(e) => e.stopPropagation()} className="whitespace-nowrap">
-                      <span className="flex flex-wrap gap-1 sm:gap-2">
-                        <button
-                          type="button"
-                          onClick={() => navigate(`/invoices/${inv.id}`)}
-                          className="btn-secondary text-sm py-1.5 px-2 sm:px-3 min-h-[36px]"
-                        >
-                          View
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDownloadPdf(inv.id, inv.invoice_number)}
-                          disabled={pdfLoadingId === inv.id}
-                          className="btn-secondary text-sm py-1.5 px-2 sm:px-3 min-h-[36px]"
-                        >
-                          {pdfLoadingId === inv.id ? '…' : 'PDF'}
-                        </button>
-                      </span>
-                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -134,6 +105,7 @@ const InvoicesPage = () => {
             )}
           </div>
         )}
+      </div>
     </div>
   );
 };

@@ -1,6 +1,8 @@
 # Backend – API Gateway + Microservices
 
-The API gateway is the single entry point for the frontend. It proxies `/api/auth` to auth-service and `/api/app/*` to customer-, ticket-, order-, invoice-, or pdf-service by path. It also exposes `GET /api/app/search?q=<term>` (JWT required), which calls each app service's search endpoint in parallel and returns aggregated JSON `{ customers, tickets, orders, invoices, items }`.
+The API gateway is the single entry point for the frontend. It proxies `/api/auth` to auth-service and `/api/app/*` to customer-, ticket-, order-, invoice-, or pdf-service by path. `/api/app/purchase-orders` and purchase order PDFs are proxied to order-service and pdf-service. It also exposes `GET /api/app/search?q=<term>` (JWT required), which calls each app service's search endpoint in parallel and returns aggregated JSON `{ customers, tickets, orders, invoices, items }`.
+
+Schema and migrations 001–013 are in `shared/`; see [shared/README.md](shared/README.md) for run order and migration scripts.
 
 ## Running locally
 

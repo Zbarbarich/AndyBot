@@ -7,23 +7,37 @@
     @apply font-sans antialiased min-w-[320px] overflow-x-hidden;
     @apply bg-dark-bg text-dark-text;
   }
-  
-  html {
-    @apply dark;
-  }
 }
 
 @layer components {
   .btn-primary {
-    @apply bg-primary text-white px-4 py-2.5 rounded-lg hover:bg-primary-hover
+    @apply bg-primary text-white px-4 py-2.5 rounded-full hover:bg-primary-hover
            transition-colors duration-300 disabled:opacity-50 disabled:cursor-not-allowed
            font-medium min-h-[44px] inline-flex items-center justify-center;
   }
 
   .btn-secondary {
-    @apply bg-dark-surface-elevated text-dark-text px-4 py-2.5 rounded-lg hover:bg-dark-surface
+    @apply bg-dark-surface-elevated text-dark-text px-4 py-2.5 rounded-full hover:bg-dark-surface
            border border-dark-border transition-colors duration-300
            disabled:opacity-50 disabled:cursor-not-allowed font-medium min-h-[44px] inline-flex items-center justify-center;
+  }
+
+  /* Icon-only primary: no box/border; green icon, hover = white icon on green bg */
+  .btn-icon-primary {
+    @apply p-2 rounded-full text-primary bg-transparent border-0 shadow-none
+           hover:text-white hover:bg-primary focus:text-white focus:bg-primary
+           transition-colors duration-300 disabled:opacity-50 disabled:cursor-not-allowed
+           inline-flex items-center justify-center min-h-[44px] min-w-[44px];
+  }
+  .btn-icon-primary:focus,
+  .btn-icon-primary:focus-visible {
+    @apply outline-none ring-2 ring-primary ring-offset-2 ring-offset-dark-bg;
+  }
+
+  /* Green text-only links (no background) for View PDF, Download PDF, Make payment, etc. */
+  .link-primary {
+    @apply text-primary hover:text-primary-hover hover:underline bg-transparent border-0 p-0 min-h-0 min-w-0
+           font-medium cursor-pointer inline-flex items-center gap-1 transition-colors;
   }
 
   .input-field {
@@ -31,6 +45,24 @@
            bg-dark-bg text-dark-text placeholder-dark-text-muted text-base
            focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent
            disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-300;
+  }
+
+  /* Filter bar: pill-shaped tab buttons (no corner rounding, full pill) — ~50% larger */
+  .pill-button {
+    @apply rounded-full min-h-[33px] px-4 py-1.5 text-sm font-medium capitalize leading-tight
+           transition-colors border bg-dark-surface text-dark-text border-dark-border
+           hover:border-dark-text-muted;
+  }
+  .pill-button.active {
+    @apply bg-primary text-white border-primary;
+  }
+
+  /* Filter search input: pill shape to match buttons */
+  .filter-search-input {
+    @apply h-9 w-40 sm:w-48 px-3 text-sm border border-dark-border bg-dark-surface
+           text-dark-text placeholder-dark-text-muted rounded-full
+           focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent
+           disabled:opacity-50 transition-colors duration-300;
   }
 
   /* Responsive page container - wider on xl/2xl, use more screen space */
@@ -66,6 +98,14 @@
     @apply grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4;
   }
 
+  /* Detail card: shared section styling for detail pages */
+  .detail-card {
+    @apply p-4 sm:p-6 rounded-xl bg-dark-surface border border-dark-border;
+  }
+  .detail-card-title {
+    @apply text-lg font-semibold text-dark-text mb-3;
+  }
+
   /* Centered page header for document pages (Quote, Order, Invoice) */
   .page-header {
     @apply text-center mb-6 sm:mb-8;
@@ -93,6 +133,13 @@
   .table-scroll .col-date { width: 6rem; max-width: 6rem; }
   .table-scroll .col-status { width: 5rem; max-width: 6rem; }
   .table-scroll .col-amount { width: 5.5rem; max-width: 6rem; font-variant-numeric: tabular-nums; }
+  /* Compact table: no min-width, fixed layout so it fits on desktop without scroll */
+  .table-scroll.table-scroll-fit table {
+    min-width: 0;
+    table-layout: fixed;
+  }
+  .table-scroll-fit .col-doc { width: 6rem; max-width: 6rem; }
+  .table-scroll-fit .col-customer { width: 8rem; max-width: 8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .table-scroll th {
     @apply bg-dark-surface-elevated border-b border-dark-border text-dark-text-muted font-medium whitespace-nowrap;
   }
@@ -134,8 +181,8 @@
 /* Dark theme is default - applied via Tailwind classes */
 
 
-/* Common Elements - touch-friendly */
-button {
+/* Common Elements - touch-friendly. Exclude all app-styled buttons so they use component classes only (pill shape, no extra box). */
+button:not(.btn-icon-primary):not(.btn-primary):not(.btn-secondary):not(.pill-button) {
   border-radius: var(--border-radius);
   border: 1px solid transparent;
   padding: 0.5rem 0.75rem;
@@ -148,18 +195,18 @@ button {
   min-width: 44px;
 }
 @media (min-width: 640px) {
-  button {
+  button:not(.btn-icon-primary):not(.btn-primary):not(.btn-secondary):not(.pill-button) {
     padding: clamp(0.4em, 1vw, 0.6em) clamp(0.8em, 2vw, 1.2em);
     min-width: 0;
   }
 }
 
-button:hover {
+button:not(.btn-icon-primary):not(.btn-primary):not(.btn-secondary):not(.pill-button):hover {
   border-color: var(--primary-color);
 }
 
-button:focus,
-button:focus-visible {
+button:not(.btn-icon-primary):not(.btn-primary):not(.btn-secondary):not(.pill-button):focus,
+button:not(.btn-icon-primary):not(.btn-primary):not(.btn-secondary):not(.pill-button):focus-visible {
   outline: 2px solid var(--primary-color);
   outline-offset: 2px;
 }
@@ -208,7 +255,7 @@ textarea {
   }
 }
 
-/* Modal Base Styles */
+/* Modal: same theme as app, overlay only dims background */
 .modal-overlay {
     position: fixed;
     top: 0;
@@ -223,22 +270,26 @@ textarea {
 }
 
 .modal-content {
-    background-color: var(--light-surface);
-    padding: var(--spacing-md);
-    border-radius: var(--border-radius);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    background-color: var(--dark-surface, #1e293b);
+    color: var(--dark-text, #e2e8f0);
+    border: 1px solid var(--dark-border, #334155);
+    padding: var(--spacing-md, 1rem);
+    border-radius: var(--border-radius, 0.5rem);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
     max-height: 85vh;
     overflow-y: auto;
-    width: var(--modal-width);
-}
-
-.dark .modal-content {
-    background-color: var(--dark-surface);
-    color: var(--dark-text);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    width: var(--modal-width, min(500px, 90vw));
 }
 
 /* Review Modal Specific */
 .review-modal .modal-content {
     width: var(--review-modal-width);
+}
+
+/* Pill shape: force full rounded. Use button.X so we beat button:not(.btn-icon-primary) (same specificity, this rule is last). */
+button.pill-button,
+button.btn-primary,
+button.btn-secondary,
+button.btn-icon-primary {
+  border-radius: 9999px;
 }

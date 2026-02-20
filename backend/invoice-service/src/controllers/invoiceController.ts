@@ -44,7 +44,8 @@ export const invoiceController = {
         return;
       }
       const linesResult = await query(invoiceQueries.getLinesByInvoiceId, [id]);
-      res.json({ ...docResult.rows[0], lines: linesResult.rows });
+      const paymentsResult = await query(invoiceQueries.getPaymentsByInvoiceId, [id]);
+      res.json({ ...docResult.rows[0], lines: linesResult.rows, payments: paymentsResult.rows });
     } catch (e) {
       console.error('invoiceController.getById', e);
       res.status(500).json({ error: 'Failed to fetch invoice' });
@@ -72,6 +73,7 @@ export const invoiceController = {
       res.status(400).json({ error: 'order_id is required' });
       return;
     }
+    const additionalShipping = Number(req.body?.additional_shipping) || 0;
 
     const client = await pool.connect();
     try {
@@ -90,6 +92,10 @@ export const invoiceController = {
         return;
       }
 
+      const existingInvoices = await client.query(invoiceQueries.getByOrderId, [orderId]);
+      const orderShipping = Number(order.shipping_amount) || 0;
+      const shippingAmount = existingInvoices.rows.length === 0 ? orderShipping + additionalShipping : additionalShipping;
+
       const billableResult = await client.query(invoiceQueries.orderBillableLines, [orderId]);
       const billableLines = billableResult.rows;
       if (billableLines.length === 0) {
@@ -105,7 +111,6 @@ export const invoiceController = {
       );
       const taxRate = Number(order.tax_rate);
       const taxAmount = subtotal * taxRate;
-      const shippingAmount = 0;
       const total = subtotal + taxAmount + shippingAmount;
 
       const invNumResult = await client.query(invoiceQueries.nextInvoiceNumber);
@@ -123,7 +128,6 @@ export const invoiceController = {
         taxAmount,
         shippingAmount,
         total,
-        'draft',
       ]);
       const invoice = createResult.rows[0];
       const invoiceId = invoice.id;
@@ -142,11 +146,17 @@ export const invoiceController = {
         await client.query(invoiceQueries.setOrderLineInvoiced, [l.id]);
       }
 
+      const countResult = await client.query(invoiceQueries.countOrderLinesNotInvoiced, [orderId]);
+      if (countResult.rows[0].count === 0) {
+        await client.query(invoiceQueries.setOrderClosed, [orderId]);
+      }
+
       await client.query('COMMIT');
 
       const fullInvoice = await query(invoiceQueries.getById, [invoiceId]);
       const linesResult = await query(invoiceQueries.getLinesByInvoiceId, [invoiceId]);
-      res.status(201).json({ ...fullInvoice.rows[0], lines: linesResult.rows });
+      const paymentsResult = await query(invoiceQueries.getPaymentsByInvoiceId, [invoiceId]);
+      res.status(201).json({ ...fullInvoice.rows[0], lines: linesResult.rows, payments: paymentsResult.rows });
     } catch (e) {
       await client.query('ROLLBACK').catch(() => {});
       console.error('invoiceController.createFromOrder', e);
@@ -163,21 +173,25 @@ export const invoiceController = {
         res.status(400).json({ error: 'Invalid invoice id' });
         return;
       }
-      const { amount, payment_method } = req.body;
+      const { amount, payment_method, reference } = req.body;
       const amountNum = amount != null ? Number(amount) : NaN;
       if (!Number.isFinite(amountNum) || amountNum <= 0) {
         res.status(400).json({ error: 'amount is required and must be a positive number' });
         return;
       }
       const method = payment_method === 'cash' || payment_method === 'check' ? payment_method : null;
-      const result = await query(invoiceQueries.recordPayment, [id, amountNum, method, new Date()]);
-      if (result.rows.length === 0) {
+      const ref = reference != null ? String(reference).trim() || null : null;
+      const invCheck = await query(invoiceQueries.getById, [id]);
+      if (invCheck.rows.length === 0) {
         res.status(404).json({ error: 'Invoice not found' });
         return;
       }
+      await query(invoiceQueries.insertPayment, [id, amountNum, method, new Date(), ref]);
+      await query(invoiceQueries.syncInvoiceAmountPaid, [id]);
       const fullInvoice = await query(invoiceQueries.getById, [id]);
       const linesResult = await query(invoiceQueries.getLinesByInvoiceId, [id]);
-      res.json({ ...fullInvoice.rows[0], lines: linesResult.rows });
+      const paymentsResult = await query(invoiceQueries.getPaymentsByInvoiceId, [id]);
+      res.json({ ...fullInvoice.rows[0], lines: linesResult.rows, payments: paymentsResult.rows });
     } catch (e) {
       console.error('invoiceController.recordPayment', e);
       res.status(500).json({ error: 'Failed to record payment' });

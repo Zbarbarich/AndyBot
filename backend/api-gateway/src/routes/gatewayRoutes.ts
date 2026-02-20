@@ -77,7 +77,8 @@ const orderProxy = createProxyMiddleware(
   (pathname) =>
     pathname.startsWith('/api/app/items') ||
     pathname.startsWith('/api/app/quotes') ||
-    (pathname.startsWith('/api/app/orders') && !/\/\d+\/invoices$/.test(pathname) && !/\/\d+\/pdf$/.test(pathname)),
+    pathname.startsWith('/api/app/purchase-orders') ||
+    (pathname.startsWith('/api/app/orders') && !/\/\d+\/invoices$/.test(pathname) && !/\/\d+\/pdf$/.test(pathname) && !/\/\d+\/quote-pdf$/.test(pathname)),
   {
   target: process.env.ORDER_SERVICE_URL || 'http://localhost:3005',
   changeOrigin: true,
@@ -128,7 +129,9 @@ const pdfProxy = createProxyMiddleware(
   (pathname) =>
     /\/quotes\/\d+\/pdf$/.test(pathname) ||
     /\/orders\/\d+\/pdf$/.test(pathname) ||
-    /\/invoices\/\d+\/pdf$/.test(pathname),
+    /\/orders\/\d+\/quote-pdf$/.test(pathname) ||
+    /\/invoices\/\d+\/pdf$/.test(pathname) ||
+    /\/purchase-orders\/\d+\/pdf$/.test(pathname),
   {
   target: process.env.PDF_SERVICE_URL || 'http://localhost:3007',
   changeOrigin: true,

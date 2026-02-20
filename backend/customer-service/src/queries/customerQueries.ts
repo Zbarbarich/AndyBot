@@ -70,7 +70,7 @@ const customerQueries = {
 
   listInvoicesByCustomerId: `
     SELECT i.id, i.invoice_number, i.order_id, i.customer_id, i.invoice_date, i.due_date,
-           i.subtotal, i.tax_amount, i.shipping_amount, i.total, i.amount_paid, i.payment_method, i.paid_at, i.status,
+           i.subtotal, i.tax_amount, i.shipping_amount, i.total, i.amount_paid, i.payment_method, i.paid_at,
            (i.total - COALESCE(i.amount_paid, 0)) AS balance_due
     FROM invoices i
     WHERE i.customer_id = $1

@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { Plus } from 'lucide-react';
+import { authFetch } from '../api/client';
+import { formatDate } from '../utils/formatDate';
 
 const API_BASE = 'http://localhost:3000/api/app/quotes';
 
@@ -22,13 +25,11 @@ const QuotesPage = () => {
   const [error, setError] = useState('');
   const [pdfLoadingId, setPdfLoadingId] = useState<number | null>(null);
 
-  const getToken = () => localStorage.getItem('token');
-
   const handleDownloadPdf = async (id: number, documentNumber: string) => {
     setPdfLoadingId(id);
     setError('');
     try {
-      const res = await fetch(`${API_BASE}/${id}/pdf`, { headers: { Authorization: `Bearer ${getToken()}` } });
+      const res = await authFetch(`${API_BASE}/${id}/pdf`);
       if (!res.ok) throw new Error('Failed to download PDF');
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
@@ -48,10 +49,8 @@ const QuotesPage = () => {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch(API_BASE, {
-        headers: { Authorization: `Bearer ${getToken()}` },
-      });
-      if (!res.ok) throw new Error(res.status === 401 ? 'Unauthorized' : 'Failed to fetch');
+      const res = await authFetch(API_BASE);
+      if (!res.ok) throw new Error('Failed to fetch');
       const data = await res.json();
       setQuotes(data);
     } catch (e) {
@@ -67,25 +66,26 @@ const QuotesPage = () => {
 
   return (
     <div className="page-container">
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
-          <h1 className="text-2xl sm:text-3xl font-bold text-dark-text">Quotes</h1>
-          <button
-            type="button"
-            onClick={() => navigate('/quotes/new')}
-            className="btn-primary w-full sm:w-auto"
-          >
-            New Quote
-          </button>
+      <div className="flex justify-end mb-2">
+        <button
+          type="button"
+          onClick={() => navigate('/quotes/new')}
+          className="btn-icon-primary"
+          aria-label="New quote"
+        >
+          <Plus className="w-5 h-5" />
+        </button>
+      </div>
+
+      {error && (
+        <div className="mb-4 p-4 rounded-lg bg-red-900/30 border border-red-700 text-red-300 text-sm sm:text-base">
+          {error}
         </div>
+      )}
 
-        {error && (
-          <div className="mb-4 p-4 rounded-lg bg-red-900/30 border border-red-700 text-red-300 text-sm sm:text-base">
-            {error}
-          </div>
-        )}
-
+      <div className="rounded-lg border border-dark-border bg-dark-surface overflow-hidden">
         {loading ? (
-          <p className="text-dark-text-muted py-8">Loading...</p>
+          <p className="text-dark-text-muted py-8 px-4">Loading...</p>
         ) : (
           <div className="table-scroll">
             <table>
@@ -110,7 +110,7 @@ const QuotesPage = () => {
                     <td>{q.customer_name}</td>
                     <td className="whitespace-nowrap">{Number(q.total).toFixed(2)}</td>
                     <td>{q.status}</td>
-                    <td className="whitespace-nowrap">{q.valid_until ?? '—'}</td>
+                    <td className="whitespace-nowrap">{formatDate(q.valid_until)}</td>
                     <td onClick={(e) => e.stopPropagation()} className="whitespace-nowrap">
                       <span className="flex flex-wrap gap-1 sm:gap-2">
                         <Link
@@ -138,6 +138,7 @@ const QuotesPage = () => {
             )}
           </div>
         )}
+      </div>
     </div>
   );
 };

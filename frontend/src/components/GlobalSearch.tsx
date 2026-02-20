@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Search, Users, Ticket, FileText, Receipt, Package } from 'lucide-react';
+import { authFetch } from '../api/client';
 
 const API_BASE = 'http://localhost:3000/api/app';
 
@@ -37,9 +38,7 @@ export default function GlobalSearch({ getToken, className = '', placeholder = '
     }
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/search?q=${encodeURIComponent(q)}`, {
-        headers: { Authorization: `Bearer ${getToken()}` },
-      });
+      const res = await authFetch(`${API_BASE}/search?q=${encodeURIComponent(q)}`);
       if (!res.ok) {
         setResults({ customers: [], tickets: [], orders: [], invoices: [], items: [] });
         return;
@@ -118,7 +117,7 @@ export default function GlobalSearch({ getToken, className = '', placeholder = '
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => query.trim() && setOpen(true)}
           placeholder={placeholder}
-          className="input-field w-full py-2 pl-9 pr-3 text-sm"
+          className="input-field w-full py-2 pl-9 pr-3 text-sm rounded-full"
           aria-label="Global search"
           aria-expanded={open}
           aria-autocomplete="list"
