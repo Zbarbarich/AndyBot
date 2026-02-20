@@ -1,7 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Plus } from 'lucide-react';
+import { useListFetch } from '../hooks/useListFetch';
+import { formatDate } from '../utils/formatDate';
 
 const API_BASE = 'http://localhost:3000/api/app/orders';
+
+type StatusFilter = 'open' | 'closed' | 'all';
 
 interface OrderSummary {
   id: number;
@@ -13,84 +18,67 @@ interface OrderSummary {
   order_date: string | null;
   total: number;
   created_at: string;
+  original_quote_id?: number | null;
 }
 
 const OrdersPage = () => {
   const navigate = useNavigate();
-  const [orders, setOrders] = useState<OrderSummary[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [pdfLoadingId, setPdfLoadingId] = useState<number | null>(null);
-
-  const getToken = () => localStorage.getItem('token');
-
-  const handleDownloadPdf = async (id: number, documentNumber: string) => {
-    setPdfLoadingId(id);
-    setError('');
-    try {
-      const res = await fetch(`${API_BASE}/${id}/pdf`, { headers: { Authorization: `Bearer ${getToken()}` } });
-      if (!res.ok) throw new Error('Failed to download PDF');
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `order-${documentNumber}.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to download PDF');
-    } finally {
-      setPdfLoadingId(null);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('open');
+  const [customerFilter, setCustomerFilter] = useState('');
+  const { data: allOrders, loading, error } = useListFetch<OrderSummary>(API_BASE);
+  const orders = useMemo(() => {
+    let list = allOrders.filter((o) => o.type === 'order' || (o.type === 'quote' && o.status !== 'converted'));
+    if (statusFilter === 'open') list = list.filter((o) => o.status !== 'closed');
+    if (statusFilter === 'closed') list = list.filter((o) => o.status === 'closed');
+    if (customerFilter.trim()) {
+      const q = customerFilter.trim().toLowerCase();
+      list = list.filter((o) => (o.customer_name ?? '').toLowerCase().includes(q));
     }
-  };
-
-  const fetchOrders = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const res = await fetch(API_BASE, {
-        headers: { Authorization: `Bearer ${getToken()}` },
-      });
-      if (!res.ok) throw new Error(res.status === 401 ? 'Unauthorized' : 'Failed to fetch');
-      const data = await res.json();
-      setOrders(data);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load orders');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchOrders();
-  }, []);
+    return list;
+  }, [allOrders, statusFilter, customerFilter]);
 
   return (
     <div className="page-container">
-        <div className="grid grid-cols-1 gap-4 mb-6">
-          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-            <h1 className="text-2xl sm:text-3xl font-bold text-dark-text">Begin Order</h1>
-            <button
-              type="button"
-              onClick={() => navigate('/orders/new')}
-              className="btn-primary w-full sm:w-auto"
-            >
-            New document
-          </button>
-          </div>
+      {error && (
+        <div className="mb-4 p-4 rounded-lg bg-red-900/30 border border-red-700 text-red-300 text-sm sm:text-base">
+          {error}
         </div>
+      )}
 
-        {error && (
-          <div className="mb-4 p-4 rounded-lg bg-red-900/30 border border-red-700 text-red-300 text-sm sm:text-base">
-            {error}
-          </div>
-        )}
+      <div className="flex flex-wrap items-center gap-1.5 mb-2">
+        {(['open', 'closed', 'all'] as const).map((tab) => (
+          <button
+            key={tab}
+            type="button"
+            onClick={() => setStatusFilter(tab)}
+            className={`pill-button ${statusFilter === tab ? 'active' : ''}`}
+          >
+            {tab}
+          </button>
+        ))}
+        <input
+          type="text"
+          value={customerFilter}
+          onChange={(e) => setCustomerFilter(e.target.value)}
+          placeholder="Customer..."
+          className="filter-search-input"
+          aria-label="Filter by customer"
+        />
+        <button
+          type="button"
+          onClick={() => navigate('/orders/new')}
+          className="btn-icon-primary ml-auto"
+          aria-label="New order"
+        >
+          <Plus className="w-5 h-5" />
+        </button>
+      </div>
 
+      <div className="rounded-lg border border-dark-border bg-dark-surface overflow-hidden">
         {loading ? (
-          <p className="text-dark-text-muted py-8">Loading...</p>
+          <p className="text-dark-text-muted py-8 px-4">Loading...</p>
         ) : (
-          <div className="grid w-full">
-            <div className="table-scroll">
+          <div className="table-scroll">
             <table>
               <thead>
                 <tr>
@@ -100,41 +88,21 @@ const OrdersPage = () => {
                   <th className="col-amount">Total</th>
                   <th className="col-status">Status</th>
                   <th className="col-date">Date</th>
-                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody className="text-dark-text">
                 {orders.map((o) => (
                   <tr
                     key={o.id}
-                    className="cursor-pointer hover:bg-dark-surface-elevated/50"
+                    className="cursor-pointer hover:bg-dark-surface-elevated/50 active:bg-dark-surface-elevated/70"
                     onClick={() => navigate(`/orders/${o.id}`)}
                   >
                     <td className="font-mono font-medium">{o.document_number}</td>
-                    <td className="col-status capitalize">{o.type ?? 'order'}</td>
+                    <td className="col-status capitalize">{o.type}</td>
                     <td>{o.customer_name}</td>
                     <td className="col-amount whitespace-nowrap">{Number(o.total).toFixed(2)}</td>
                     <td className="col-status">{o.status}</td>
-                    <td className="col-date whitespace-nowrap">{o.order_date ?? '—'}</td>
-                    <td className="whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                      <span className="flex flex-wrap gap-1 sm:gap-2">
-                        <button
-                          type="button"
-                          onClick={() => navigate(`/orders/${o.id}`)}
-                          className="btn-secondary text-sm py-1.5 px-2 sm:px-3 min-h-[36px]"
-                        >
-                          View
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDownloadPdf(o.id, o.document_number)}
-                          disabled={pdfLoadingId === o.id}
-                          className="btn-secondary text-sm py-1.5 px-2 sm:px-3 min-h-[36px]"
-                        >
-                          {pdfLoadingId === o.id ? '…' : 'PDF'}
-                        </button>
-                      </span>
-                    </td>
+                    <td className="col-date whitespace-nowrap">{formatDate(o.order_date)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -142,9 +110,9 @@ const OrdersPage = () => {
             {orders.length === 0 && (
               <p className="p-6 text-dark-text-muted text-center">No orders yet. Create one or convert a quote.</p>
             )}
-            </div>
           </div>
         )}
+      </div>
     </div>
   );
 };

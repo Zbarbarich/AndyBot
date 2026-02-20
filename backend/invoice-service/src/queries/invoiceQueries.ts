@@ -4,7 +4,7 @@ const invoiceQueries = {
   list: `
     SELECT i.id, i.invoice_number, i.order_id, i.customer_id, i.ticket_id, i.invoice_date, i.due_date,
            i.subtotal, i.tax_rate, i.tax_amount, i.shipping_amount, i.total, i.amount_paid, i.payment_method, i.paid_at,
-           i.status, i.created_at, i.updated_at,
+           i.created_at, i.updated_at,
            (i.total - COALESCE(i.amount_paid, 0)) AS balance_due,
            q.document_number AS order_document_number,
            c.name AS customer_name
@@ -17,7 +17,7 @@ const invoiceQueries = {
   search: `
     SELECT i.id, i.invoice_number, i.order_id, i.customer_id, i.ticket_id, i.invoice_date, i.due_date,
            i.subtotal, i.tax_rate, i.tax_amount, i.shipping_amount, i.total, i.amount_paid, i.payment_method, i.paid_at,
-           i.status, i.created_at, i.updated_at,
+           i.created_at, i.updated_at,
            (i.total - COALESCE(i.amount_paid, 0)) AS balance_due,
            q.document_number AS order_document_number,
            c.name AS customer_name
@@ -32,7 +32,7 @@ const invoiceQueries = {
   getById: `
     SELECT i.id, i.invoice_number, i.order_id, i.customer_id, i.ticket_id, i.invoice_date, i.due_date,
            i.subtotal, i.tax_rate, i.tax_amount, i.shipping_amount, i.total, i.amount_paid, i.payment_method, i.paid_at,
-           i.status, i.created_at, i.updated_at,
+           i.created_at, i.updated_at,
            (i.total - COALESCE(i.amount_paid, 0)) AS balance_due,
            q.document_number AS order_document_number,
            c.name AS customer_name
@@ -51,7 +51,7 @@ const invoiceQueries = {
 
   getByOrderId: `
     SELECT i.id, i.invoice_number, i.order_id, i.customer_id, i.invoice_date, i.due_date,
-           i.subtotal, i.tax_amount, i.shipping_amount, i.total, i.status,
+           i.subtotal, i.tax_amount, i.shipping_amount, i.total,
            c.name AS customer_name
     FROM invoices i
     JOIN customers c ON c.id = i.customer_id
@@ -67,9 +67,9 @@ const invoiceQueries = {
   `,
 
   createInvoice: `
-    INSERT INTO invoices (invoice_number, order_id, customer_id, ticket_id, invoice_date, due_date, subtotal, tax_rate, tax_amount, shipping_amount, total, status)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-    RETURNING id, invoice_number, order_id, customer_id, ticket_id, invoice_date, due_date, subtotal, tax_rate, tax_amount, shipping_amount, total, amount_paid, payment_method, paid_at, status, created_at, updated_at
+    INSERT INTO invoices (invoice_number, order_id, customer_id, ticket_id, invoice_date, due_date, subtotal, tax_rate, tax_amount, shipping_amount, total)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+    RETURNING id, invoice_number, order_id, customer_id, ticket_id, invoice_date, due_date, subtotal, tax_rate, tax_amount, shipping_amount, total, amount_paid, payment_method, paid_at, created_at, updated_at
   `,
 
   insertInvoiceLine: `
@@ -80,14 +80,32 @@ const invoiceQueries = {
 
   setOrderLineInvoiced: `UPDATE quote_order_lines SET billing_status = 'invoiced' WHERE id = $1`,
 
-  recordPayment: `
-    UPDATE invoices
-    SET amount_paid = LEAST(COALESCE(amount_paid, 0) + $2, total),
-        payment_method = COALESCE($3, payment_method),
-        paid_at = CASE WHEN (COALESCE(amount_paid, 0) + $2) >= total THEN COALESCE($4, NOW()) ELSE paid_at END,
+  countOrderLinesNotInvoiced: `SELECT COUNT(*)::int AS count FROM quote_order_lines WHERE quote_order_id = $1 AND billing_status != 'invoiced'`,
+
+  setOrderClosed: `UPDATE quotes_orders SET status = 'closed', updated_at = NOW() WHERE id = $1 AND type = 'order' RETURNING id`,
+
+  getPaymentsByInvoiceId: `
+    SELECT id, invoice_id, amount, payment_method, paid_at, reference
+    FROM invoice_payments
+    WHERE invoice_id = $1
+    ORDER BY paid_at ASC
+  `,
+
+  insertPayment: `
+    INSERT INTO invoice_payments (invoice_id, amount, payment_method, paid_at, reference)
+    VALUES ($1, $2, $3, $4, $5)
+    RETURNING id, invoice_id, amount, payment_method, paid_at, reference
+  `,
+
+  syncInvoiceAmountPaid: `
+    UPDATE invoices i
+    SET amount_paid = LEAST((SELECT COALESCE(SUM(amount), 0)::numeric FROM invoice_payments WHERE invoice_id = i.id), i.total),
+        payment_method = (SELECT payment_method FROM invoice_payments WHERE invoice_id = i.id ORDER BY paid_at DESC LIMIT 1),
+        paid_at = CASE WHEN (SELECT COALESCE(SUM(amount), 0)::numeric FROM invoice_payments WHERE invoice_id = i.id) >= i.total
+          THEN (SELECT MAX(paid_at) FROM invoice_payments WHERE invoice_id = i.id) ELSE paid_at END,
         updated_at = NOW()
-    WHERE id = $1
-    RETURNING id, invoice_number, order_id, customer_id, ticket_id, invoice_date, due_date, subtotal, tax_rate, tax_amount, shipping_amount, total, amount_paid, payment_method, paid_at, status, created_at, updated_at
+    WHERE i.id = $1
+    RETURNING id, invoice_number, order_id, customer_id, ticket_id, invoice_date, due_date, subtotal, tax_rate, tax_amount, shipping_amount, total, amount_paid, payment_method, paid_at, created_at, updated_at
   `,
 };
 

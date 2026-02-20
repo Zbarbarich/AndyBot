@@ -51,7 +51,7 @@ export const itemController = {
 
   async create(req: AppRequest, res: Response): Promise<void> {
     try {
-      const { sku, name, category, description, unit_price, taxable } = req.body;
+      const { sku, name, category, description, unit_price, taxable, stock, our_cost, unit_of_measure } = req.body;
       if (!sku || typeof sku !== 'string' || !sku.trim()) {
         res.status(400).json({ error: 'SKU is required' });
         return;
@@ -66,6 +66,9 @@ export const itemController = {
         return;
       }
       const price = parseFloat(unit_price);
+      const stockNum = stock !== undefined ? parseFloat(stock) : 0;
+      const costNum = our_cost !== undefined ? parseFloat(our_cost) : 0;
+      const um = unit_of_measure != null ? String(unit_of_measure).trim() || 'EA' : 'EA';
       const result = await query(itemQueries.create, [
         sku.trim(),
         name.trim(),
@@ -73,6 +76,9 @@ export const itemController = {
         description ?? null,
         isNaN(price) ? 0 : price,
         taxable !== false,
+        isNaN(stockNum) ? 0 : stockNum,
+        isNaN(costNum) ? 0 : costNum,
+        um,
       ]);
       res.status(201).json(result.rows[0]);
     } catch (e) {
@@ -88,8 +94,11 @@ export const itemController = {
         res.status(400).json({ error: 'Invalid item id' });
         return;
       }
-      const { name, category, description, unit_price, taxable } = req.body;
+      const { name, category, description, unit_price, taxable, stock, our_cost, unit_of_measure } = req.body;
       const price = unit_price !== undefined ? parseFloat(unit_price) : undefined;
+      const stockNum = stock !== undefined ? parseFloat(stock) : undefined;
+      const costNum = our_cost !== undefined ? parseFloat(our_cost) : undefined;
+      const um = unit_of_measure !== undefined ? (unit_of_measure != null ? String(unit_of_measure).trim() || undefined : undefined) : undefined;
       const result = await query(itemQueries.update, [
         id,
         name ?? undefined,
@@ -97,6 +106,9 @@ export const itemController = {
         description ?? undefined,
         price !== undefined ? (isNaN(price) ? 0 : price) : undefined,
         taxable !== undefined ? !!taxable : undefined,
+        stockNum !== undefined ? (isNaN(stockNum as number) ? 0 : stockNum) : undefined,
+        costNum !== undefined ? (isNaN(costNum as number) ? 0 : costNum) : undefined,
+        um,
       ]);
       if (result.rows.length === 0) {
         res.status(404).json({ error: 'Item not found' });

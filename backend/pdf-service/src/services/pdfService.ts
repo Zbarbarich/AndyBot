@@ -12,6 +12,13 @@ interface DocLine {
   description: string | null;
   quantity: number;
   unit_price: number;
+  unit_of_measure?: string | null;
+}
+
+export interface PaymentRow {
+  amount: number;
+  payment_method: string | null;
+  paid_at: string;
 }
 
 export interface DocData {
@@ -24,12 +31,15 @@ export interface DocData {
   invoice_date?: string;
   due_date?: string | null;
   notes?: string | null;
+  customer_po_number?: string | null;
   lines: DocLine[];
   subtotal: number;
   tax_rate: number;
   tax_amount: number;
   shipping_amount: number;
   total: number;
+  amount_paid?: number;
+  payments?: PaymentRow[];
 }
 
 type PDFDoc = InstanceType<typeof PDFDocument>;
@@ -106,20 +116,26 @@ function commonDocLayout(
   doc.text(`${docNumberLabel} ${data.document_number}`, PAGE_MARGIN, y, { width: CONTENT_WIDTH, align: 'right' });
   y += 16;
   doc.text(dateLine, PAGE_MARGIN, y, { width: CONTENT_WIDTH, align: 'right' });
-  y += 24;
+  y += 16;
+  if (data.customer_po_number) {
+    doc.text(`Customer PO: ${data.customer_po_number}`, PAGE_MARGIN, y, { width: CONTENT_WIDTH, align: 'right' });
+    y += 16;
+  }
+  y += 8;
 
   doc.font('Helvetica-Bold').text('Bill to:', PAGE_MARGIN, y);
   y += 18;
   doc.font('Helvetica').text(data.customer_name, PAGE_MARGIN, y);
   y += 28;
 
-  const colWidths = [220, 60, 80, 90];
+  const colWidths = [180, 32, 52, 72, 82];
   y = drawBorderedTable(
     doc,
     y,
-    ['Description', 'Qty', 'Unit price', 'Extended'],
+    ['Description', 'U/M', 'Qty', 'Unit price', 'Extended'],
     data.lines.map((l) => [
       l.description ?? '—',
+      l.unit_of_measure ?? 'EA',
       Number(l.quantity),
       Number(l.unit_price).toFixed(2),
       (Number(l.quantity) * Number(l.unit_price)).toFixed(2),
@@ -219,20 +235,26 @@ export async function streamInvoicePdf(data: DocData, res: Response): Promise<vo
   doc.text(`Invoice date: ${data.invoice_date ?? '—'}`, PAGE_MARGIN, y, { width: CONTENT_WIDTH, align: 'right' });
   y += 16;
   doc.text(`Due date: ${data.due_date ?? '—'}`, PAGE_MARGIN, y, { width: CONTENT_WIDTH, align: 'right' });
-  y += 24;
+  y += 16;
+  if (data.customer_po_number) {
+    doc.text(`Customer PO: ${data.customer_po_number}`, PAGE_MARGIN, y, { width: CONTENT_WIDTH, align: 'right' });
+    y += 16;
+  }
+  y += 8;
 
   doc.font('Helvetica-Bold').text('Bill to:', PAGE_MARGIN, y);
   y += 18;
   doc.font('Helvetica').text(data.customer_name, PAGE_MARGIN, y);
   y += 28;
 
-  const colWidths = [220, 60, 80, 90];
+  const colWidths = [180, 32, 52, 72, 82];
   y = drawBorderedTable(
     doc,
     y,
-    ['Description', 'Qty', 'Unit price', 'Extended'],
+    ['Description', 'U/M', 'Qty', 'Unit price', 'Extended'],
     data.lines.map((l) => [
       l.description ?? '—',
+      l.unit_of_measure ?? 'EA',
       Number(l.quantity),
       Number(l.unit_price).toFixed(2),
       (Number(l.quantity) * Number(l.unit_price)).toFixed(2),
@@ -249,11 +271,89 @@ export async function streamInvoicePdf(data: DocData, res: Response): Promise<vo
   doc.text(`Shipping: ${Number(data.shipping_amount).toFixed(2)}`, totalsX, y);
   y += 16;
   doc.font('Helvetica-Bold').text(`Total: ${Number(data.total).toFixed(2)}`, totalsX, y);
+  y += 16;
+  const paid = data.amount_paid ?? 0;
+  doc.text(`Amount paid: ${Number(paid).toFixed(2)}`, totalsX, y);
+  y += 16;
+  doc.text(`Balance due: ${Number(Number(data.total) - paid).toFixed(2)}`, totalsX, y);
   y += 24;
+
+  if (data.payments && data.payments.length > 0) {
+    doc.font('Helvetica-Bold').fontSize(10).text('Payments', PAGE_MARGIN, y);
+    y += 18;
+    doc.font('Helvetica').fontSize(9);
+    for (const p of data.payments) {
+      const d = p.paid_at ? new Date(p.paid_at).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' }) : '—';
+      doc.text(`${d}  ${Number(p.amount).toFixed(2)}  ${p.payment_method ?? '—'}`, PAGE_MARGIN, y, { width: CONTENT_WIDTH });
+      y += 14;
+    }
+    y += 8;
+  }
 
   if (data.notes) {
     doc.font('Helvetica').fontSize(9).text(`Notes: ${data.notes}`, PAGE_MARGIN, y, { width: CONTENT_WIDTH });
   }
+
+  doc.end();
+  await streamDone;
+}
+
+export interface POLine {
+  description: string | null;
+  quantity: number;
+  unit_cost: number;
+  item_sku?: string | null;
+  item_name?: string | null;
+}
+
+export interface POData {
+  po_number: string;
+  order_document_number: string;
+  customer_name: string;
+  created_at: string;
+  lines: POLine[];
+}
+
+export async function streamPurchaseOrderPdf(data: POData, res: Response): Promise<void> {
+  const doc = new PDFDocument({ margin: PAGE_MARGIN, size: 'A4' });
+  const { streamDone } = setupDoc(doc, 'Purchase Order');
+  doc.pipe(res);
+
+  let y = await addCompanyHeader(doc);
+  if (y < 100) y = 100;
+
+  doc.fontSize(16).font('Helvetica-Bold');
+  doc.text('PURCHASE ORDER', 0, y, { align: 'center', width: PAGE_WIDTH });
+  y += 28;
+
+  doc.fontSize(10).font('Helvetica');
+  doc.text(`PO #: ${data.po_number}`, PAGE_MARGIN, y, { width: CONTENT_WIDTH, align: 'right' });
+  y += 16;
+  doc.text(`Order: ${data.order_document_number}`, PAGE_MARGIN, y, { width: CONTENT_WIDTH, align: 'right' });
+  y += 16;
+  doc.text(`Date: ${data.created_at ? new Date(data.created_at).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' }) : '—'}`, PAGE_MARGIN, y, { width: CONTENT_WIDTH, align: 'right' });
+  y += 16;
+  doc.text(`Customer: ${data.customer_name}`, PAGE_MARGIN, y, { width: CONTENT_WIDTH, align: 'right' });
+  y += 28;
+
+  const colWidths = [200, 60, 80, 95];
+  y = drawBorderedTable(
+    doc,
+    y,
+    ['Description', 'Qty', 'Unit cost', 'Extended'],
+    data.lines.map((l) => [
+      l.description ?? l.item_name ?? l.item_sku ?? '—',
+      Number(l.quantity),
+      Number(l.unit_cost).toFixed(2),
+      (Number(l.quantity) * Number(l.unit_cost)).toFixed(2),
+    ]),
+    colWidths
+  );
+
+  const total = data.lines.reduce((sum, l) => sum + Number(l.quantity) * Number(l.unit_cost), 0);
+  y += 18;
+  const totalsX = PAGE_MARGIN + CONTENT_WIDTH - 140;
+  doc.font('Helvetica-Bold').text(`Total: ${Number(total).toFixed(2)}`, totalsX, y);
 
   doc.end();
   await streamDone;

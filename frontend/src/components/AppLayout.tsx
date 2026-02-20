@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Link, Outlet, useNavigate } from 'react-router-dom';
+import { Link, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
   Home,
   Users,
@@ -7,6 +7,7 @@ import {
   ShoppingCart,
   Receipt,
   Package,
+  ShoppingBag,
   Shield,
   ChevronLeft,
   CircleUser,
@@ -17,12 +18,39 @@ import {
 import { useAuth } from '../context/AuthContext';
 import GlobalSearch from './GlobalSearch';
 
+function getPageTitle(pathname: string): string {
+  if (pathname === '/') return 'Home';
+  if (pathname === '/customers') return 'Customers';
+  if (pathname === '/customers/new') return 'New Customer';
+  if (/^\/customers\/\d+$/.test(pathname)) return 'Customer';
+  if (pathname === '/tickets') return 'Tickets';
+  if (pathname === '/tickets/new') return 'New Ticket';
+  if (/^\/tickets\/\d+\/edit$/.test(pathname)) return 'Edit Ticket';
+  if (/^\/tickets\/\d+$/.test(pathname)) return 'Ticket';
+  if (pathname === '/orders') return 'Begin Order';
+  if (pathname === '/orders/new' || /^\/orders\/\d+$/.test(pathname)) return 'Order';
+  if (/^\/orders\/\d+\/billing$/.test(pathname)) return 'Billing';
+  if (pathname === '/invoices') return 'Invoices';
+  if (pathname === '/invoices/bill-order') return 'Bill an order';
+  if (/^\/invoices\/\d+$/.test(pathname)) return 'Invoice';
+  if (pathname === '/items') return 'Items';
+  if (pathname === '/items/new') return 'New Item';
+  if (/^\/items\/\d+\/edit$/.test(pathname)) return 'Edit Item';
+  if (/^\/items\/\d+$/.test(pathname)) return 'Item';
+  if (pathname === '/admin') return 'Admin';
+  if (pathname === '/admin/users/new') return 'Create User';
+  if (pathname === '/purchasing') return 'Purchasing';
+  if (/^\/purchasing\/\d+$/.test(pathname)) return 'Purchase Order';
+  return '19th Chamber';
+}
+
 const navLinks = [
   { to: '/', label: 'Home', icon: Home },
   { to: '/customers', label: 'Customers', icon: Users },
   { to: '/tickets', label: 'Tickets', icon: Ticket },
   { to: '/orders', label: 'Begin Order', icon: ShoppingCart },
   { to: '/invoices', label: 'Invoices', icon: Receipt },
+  { to: '/purchasing', label: 'Purchasing', icon: ShoppingBag },
   { to: '/items', label: 'Items', icon: Package },
   { to: '/admin', label: 'Admin', icon: Shield },
 ];
@@ -31,8 +59,10 @@ const sidebarLinkClass =
   'block w-full py-2.5 px-4 text-left text-dark-text hover:text-primary hover:bg-dark-surface-elevated transition-colors font-medium rounded-lg min-h-[44px] flex items-center gap-3';
 
 const AppLayout = () => {
+  const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const pageTitle = getPageTitle(location.pathname);
   const [menuOpen, setMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -63,7 +93,7 @@ const AppLayout = () => {
           sidebarCollapsed ? 'lg:w-[56px]' : 'lg:w-52'
         }`}
       >
-        <div className="p-3 flex items-center justify-between border-b border-dark-border min-h-[57px]">
+        <div className="p-2 flex items-center justify-between border-b border-dark-border min-h-[44px]">
           {!sidebarCollapsed && (
             <Link to="/" className="text-lg font-semibold text-primary truncate">
               19th Chamber
@@ -97,15 +127,17 @@ const AppLayout = () => {
 
       {/* Right side: top bar + main */}
       <div className="flex flex-col flex-1 min-w-0">
-        {/* Desktop top bar */}
-        <header className="hidden lg:flex items-center gap-4 px-4 sm:px-6 py-3 bg-dark-surface border-b border-dark-border sticky top-0 z-40">
-          <Link to="/" className="text-lg font-semibold text-primary hover:text-primary-light shrink-0">
-            The Nineteenth Chamber
-          </Link>
-          <div className="flex-1 max-w-md min-w-0">
-            <GlobalSearch getToken={() => localStorage.getItem('token')} placeholder="Search customers, tickets, orders, invoices…" />
+        {/* Desktop top bar - thin: title left, search centered in bar, profile far right */}
+        <header className="hidden lg:flex items-center gap-3 px-4 sm:px-6 py-1.5 min-h-[44px] bg-dark-surface border-b border-dark-border sticky top-0 z-40">
+          <div className="flex-1 min-w-0 flex items-center">
+            <span className="text-sm font-semibold text-dark-text whitespace-nowrap" aria-hidden="true">
+              {pageTitle}
+            </span>
           </div>
-          <div className="flex items-center gap-2 shrink-0 ml-auto">
+          <div className="shrink-0 w-full max-w-2xl">
+            <GlobalSearch getToken={() => localStorage.getItem('token')} placeholder="Search customers, tickets, orders, invoices…" className="w-full" />
+          </div>
+          <div className="flex-1 min-w-0 flex items-center justify-end">
             <div className="relative" ref={profileRef}>
               <button
                 type="button"
@@ -132,27 +164,14 @@ const AppLayout = () => {
                 </div>
               )}
             </div>
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="bg-transparent text-dark-text-muted hover:text-dark-text hover:underline min-h-[44px] px-2 font-medium"
-            >
-              Logout
-            </button>
           </div>
         </header>
 
         {/* Mobile: nav bar with search + hamburger */}
         <nav className="lg:hidden bg-dark-surface border-b border-dark-border sticky top-0 z-50">
-          <div className="max-w-container mx-auto px-4 sm:px-6 py-2 flex flex-col gap-2">
-            <div className="flex justify-between items-center gap-2 min-h-[44px]">
-              <Link
-                to="/"
-                className="text-lg sm:text-xl font-semibold text-primary hover:text-primary-light transition-colors truncate flex items-center shrink-0"
-                onClick={() => setMenuOpen(false)}
-              >
-                The Nineteenth Chamber
-              </Link>
+          <div className="max-w-container mx-auto px-4 sm:px-6 py-1.5 flex flex-col gap-2">
+            <div className="flex justify-between items-center gap-2 min-h-[40px]">
+              <span className="text-sm font-semibold text-dark-text truncate">{pageTitle}</span>
               <button
                 type="button"
                 onClick={() => setMenuOpen((o) => !o)}

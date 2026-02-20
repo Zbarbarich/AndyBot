@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { TicketSelector } from '../components/TicketSelector';
+import { authFetch } from '../api/client';
 
 const QUOTES_API = 'http://localhost:3000/api/app/quotes';
 const CUSTOMERS_API = 'http://localhost:3000/api/app/customers';
@@ -18,6 +20,8 @@ interface Item {
   taxable: boolean;
 }
 
+const UNIT_OPTIONS = ['EA', 'DZ', 'ST', 'HR'] as const;
+
 interface LineRow {
   id?: number;
   item_id: number | null;
@@ -26,6 +30,7 @@ interface LineRow {
   description: string;
   quantity: number;
   unit_price: number;
+  unit_of_measure?: string;
   sort_order: number;
 }
 
@@ -50,13 +55,15 @@ interface QuoteDetail {
     description: string | null;
     quantity: number;
     unit_price: number;
+    unit_of_measure?: string | null;
+    item_unit_of_measure?: string | null;
     sort_order: number;
     item_sku?: string;
     item_name?: string;
   }>;
 }
 
-const emptyLine = (): LineRow => ({ item_id: null, description: '', quantity: 1, unit_price: 0, sort_order: 0 });
+const emptyLine = (): LineRow => ({ item_id: null, description: '', quantity: 1, unit_price: 0, unit_of_measure: 'EA', sort_order: 0 });
 
 const QuoteDetailPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -72,32 +79,31 @@ const QuoteDetailPage = () => {
   const [form, setForm] = useState({
     customer_id: '',
     ticket_id: '',
-    status: 'draft',
+    status: 'open',
     valid_until: '',
     notes: '',
+    customer_po_number: '',
     tax_rate: '0.08',
     shipping_amount: '0',
   });
   const [lines, setLines] = useState<LineRow[]>([]);
 
-  const getToken = () => localStorage.getItem('token');
-
   const fetchCustomers = useCallback(async () => {
-    const res = await fetch(CUSTOMERS_API, { headers: { Authorization: `Bearer ${getToken()}` } });
+    const res = await authFetch(CUSTOMERS_API);
     if (!res.ok) return;
     const data = await res.json();
     setCustomers(data);
   }, []);
 
   const fetchItems = useCallback(async () => {
-    const res = await fetch(ITEMS_API, { headers: { Authorization: `Bearer ${getToken()}` } });
+    const res = await authFetch(ITEMS_API);
     if (!res.ok) return;
     const data = await res.json();
     setItems(data);
   }, []);
 
   const fetchQuote = useCallback(async (quoteId: number) => {
-    const res = await fetch(`${QUOTES_API}/${quoteId}`, { headers: { Authorization: `Bearer ${getToken()}` } });
+    const res = await authFetch(`${QUOTES_API}/${quoteId}`);
     if (!res.ok) return null;
     return res.json();
   }, []);
@@ -110,7 +116,7 @@ const QuoteDetailPage = () => {
       await fetchCustomers();
       await fetchItems();
       if (isNew) {
-        setForm({ customer_id: '', ticket_id: '', status: 'draft', valid_until: '', notes: '', tax_rate: '0.08', shipping_amount: '0' });
+        setForm({ customer_id: '', ticket_id: '', status: 'open', valid_until: '', notes: '', customer_po_number: '', tax_rate: '0.08', shipping_amount: '0' });
         setLines([emptyLine()]);
         setQuote(null);
         setLoading(false);
@@ -133,15 +139,16 @@ const QuoteDetailPage = () => {
       setForm({
         customer_id: String(data.customer_id),
         ticket_id: data.ticket_id != null ? String(data.ticket_id) : '',
-        status: data.status || 'draft',
+        status: data.status || 'open',
         valid_until: data.valid_until ?? '',
         notes: data.notes ?? '',
+        customer_po_number: data.customer_po_number ?? '',
         tax_rate: String(Number(data.tax_rate)),
         shipping_amount: String(Number(data.shipping_amount)),
       });
       setLines(
         data.lines && data.lines.length > 0
-          ? data.lines.map((l: LineRow & { item_sku?: string; item_name?: string }, i: number) => ({
+          ? data.lines.map((l: LineRow & { item_sku?: string; item_name?: string; unit_of_measure?: string | null; item_unit_of_measure?: string | null }, i: number) => ({
               id: l.id,
               item_id: l.item_id ?? null,
               item_sku: l.item_sku,
@@ -149,6 +156,7 @@ const QuoteDetailPage = () => {
               description: l.description ?? '',
               quantity: Number(l.quantity),
               unit_price: Number(l.unit_price),
+              unit_of_measure: l.unit_of_measure ?? l.item_unit_of_measure ?? 'EA',
               sort_order: l.sort_order ?? i,
             }))
           : [emptyLine()]
@@ -179,6 +187,7 @@ const QuoteDetailPage = () => {
         status: form.status,
         valid_until: form.valid_until || null,
         notes: form.notes || null,
+        customer_po_number: form.customer_po_number || null,
         tax_rate: parseFloat(form.tax_rate) || 0,
         shipping_amount: parseFloat(form.shipping_amount) || 0,
         lines: lines.map((l, i) => ({
@@ -186,13 +195,14 @@ const QuoteDetailPage = () => {
           description: l.description || null,
           quantity: l.quantity,
           unit_price: l.unit_price,
+          unit_of_measure: l.unit_of_measure || 'EA',
           sort_order: i,
         })),
       };
       if (isNew) {
-        const res = await fetch(QUOTES_API, {
+        const res = await authFetch(QUOTES_API, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
         });
         const data = await res.json().catch(() => ({}));
@@ -200,9 +210,9 @@ const QuoteDetailPage = () => {
         navigate(`/quotes/${data.id}`);
         return;
       }
-      const res = await fetch(`${QUOTES_API}/${quote!.id}`, {
+      const res = await authFetch(`${QUOTES_API}/${quote!.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
       const data = await res.json().catch(() => ({}));
@@ -220,9 +230,9 @@ const QuoteDetailPage = () => {
     setError('');
     setConverting(true);
     try {
-      const res = await fetch(`${QUOTES_API}/${quote.id}/convert-to-order`, {
+      const res = await authFetch(`${QUOTES_API}/${quote.id}/convert-to-order`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${getToken()}` },
+        headers: { 'Content-Type': 'application/json' },
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Failed to convert');
@@ -279,7 +289,7 @@ const QuoteDetailPage = () => {
                   type="button"
                   onClick={async () => {
                     try {
-                      const res = await fetch(`${QUOTES_API}/${quote.id}/pdf`, { headers: { Authorization: `Bearer ${getToken()}` } });
+                      const res = await authFetch(`${QUOTES_API}/${quote.id}/pdf`);
                       if (!res.ok) throw new Error('Failed to load PDF');
                       const blob = await res.blob();
                       const url = URL.createObjectURL(blob);
@@ -297,7 +307,7 @@ const QuoteDetailPage = () => {
                   type="button"
                   onClick={async () => {
                     try {
-                      const res = await fetch(`${QUOTES_API}/${quote.id}/pdf`, { headers: { Authorization: `Bearer ${getToken()}` } });
+                      const res = await authFetch(`${QUOTES_API}/${quote.id}/pdf`);
                       if (!res.ok) throw new Error('Failed to download PDF');
                       const blob = await res.blob();
                       const url = URL.createObjectURL(blob);
@@ -356,13 +366,11 @@ const QuoteDetailPage = () => {
                   ))}
                 </select>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-dark-text-muted mb-1">Ticket ID</label>
-                <input
-                  type="number"
+              <div className="sm:col-span-2">
+                <TicketSelector
                   value={form.ticket_id}
-                  onChange={(e) => setForm((f) => ({ ...f, ticket_id: e.target.value }))}
-                  className="input-field w-32"
+                  onChange={(v) => setForm((f) => ({ ...f, ticket_id: v }))}
+                  customerId={form.customer_id}
                   disabled={readOnly}
                 />
               </div>
@@ -375,9 +383,8 @@ const QuoteDetailPage = () => {
                     className="input-field max-w-[140px]"
                     disabled={readOnly}
                   >
-                    <option value="draft">Draft</option>
-                    <option value="sent">Sent</option>
-                    <option value="accepted">Accepted</option>
+                    <option value="open">Open</option>
+                    <option value="closed">Closed</option>
                     {isConverted && <option value="converted">Converted</option>}
                   </select>
                 </div>
@@ -392,6 +399,17 @@ const QuoteDetailPage = () => {
                   disabled={readOnly}
                 />
               </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-dark-text-muted mb-1">Customer PO</label>
+              <input
+                type="text"
+                value={form.customer_po_number}
+                onChange={(e) => setForm((f) => ({ ...f, customer_po_number: e.target.value }))}
+                className="input-field"
+                placeholder="N/A"
+                disabled={readOnly}
+              />
             </div>
             <div>
               <label className="block text-sm font-medium text-dark-text-muted mb-1">Notes</label>
@@ -413,6 +431,7 @@ const QuoteDetailPage = () => {
                   <tr>
                     <th>Item / Description</th>
                     <th>Qty</th>
+                    <th>U/M</th>
                     <th>Unit price</th>
                     <th>Extended</th>
                     {!readOnly && <th></th>}
@@ -458,6 +477,18 @@ const QuoteDetailPage = () => {
                           className="input-field w-20"
                           disabled={readOnly}
                         />
+                      </td>
+                      <td>
+                        <select
+                          value={line.unit_of_measure ?? 'EA'}
+                          onChange={(e) => updateLine(idx, 'unit_of_measure', e.target.value)}
+                          className="input-field w-16"
+                          disabled={readOnly}
+                        >
+                          {UNIT_OPTIONS.map((u) => (
+                            <option key={u} value={u}>{u}</option>
+                          ))}
+                        </select>
                       </td>
                       <td>
                         <input

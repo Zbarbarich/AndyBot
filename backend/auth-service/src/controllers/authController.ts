@@ -16,6 +16,7 @@ interface User {
 }
 
 const generateJWT = (user: { email: string; role: string; userID: number }): string => {
+  const expiresIn = process.env.JWT_EXPIRES_IN || "1h";
   return jwt.sign(
     {
       email: user.email,
@@ -24,7 +25,7 @@ const generateJWT = (user: { email: string; role: string; userID: number }): str
     },
     process.env.JWT_SECRET as string,
     {
-      expiresIn: "1h",
+      expiresIn: expiresIn as jwt.SignOptions["expiresIn"],
       algorithm: "HS256",
     }
   );

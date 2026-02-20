@@ -22,7 +22,7 @@ theNineteenthChamber/
 │   ├── order-service/           # Orders, quotes, items (port 3005)
 │   ├── invoice-service/         # Invoices (port 3006)
 │   ├── pdf-service/             # PDF generation (port 3007)
-│   ├── shared/                  # Shared SQL schema (migrations 001-006)
+│   ├── shared/                  # Shared SQL schema (migrations 001-013, incl. purchase orders)
 │   └── scripts/
 │       └── setup-env.sh         # Copy env to app services and set ports
 └── package.json                # Root scripts (install-all, start)
@@ -61,7 +61,7 @@ theNineteenthChamber/
    CREATE DATABASE "TheNineteenthChamber";
    ```
 
-4. **Run database migrations:** Run the schema files in `backend/shared/schema/` once (001 through 006) against your database. See [backend/shared/README.md](backend/shared/README.md).
+4. **Run database migrations:** Run the schema files in `backend/shared/schema/` once (001 through 013; see [backend/shared/README.md](backend/shared/README.md)). Migration 007 is optional (destructive fresh start); 008–013 are sequential.
 
 5. **Start services:**
    ```bash
@@ -102,12 +102,13 @@ Hot reloading is enabled for both frontend (Vite HMR) and backend (Nodemon).
 - `DELETE /api/auth/users/:id` - Delete user (admin)
 
 **App (JWT required; gateway proxies to the appropriate service):**
-- Customers, tickets, orders, quotes, invoices, items, and PDFs are exposed under `/api/app/*`. The gateway proxies requests to customer-service, ticket-service, order-service, invoice-service, or pdf-service by path.
+- Customers, tickets, orders, quotes, invoices, items, purchase orders, and PDFs are exposed under `/api/app/*`. The gateway proxies requests to customer-service, ticket-service, order-service, invoice-service, or pdf-service by path.
+- **Purchase orders:** `GET /api/app/purchase-orders`, `GET /api/app/purchase-orders/:id`, `GET /api/app/purchase-orders/:id/pdf` (proxied to order-service and pdf-service).
 - **Global search:** `GET /api/app/search?q=<term>` returns aggregated results from customers, tickets, orders, invoices, and items in one response: `{ customers, tickets, orders, invoices, items }`.
 
 ## Database Schema
 
-The same PostgreSQL database is used by auth-service and all app services. Schema is in `backend/shared/schema/`; run migrations 001-006 once.
+The same PostgreSQL database is used by auth-service and all app services. Schema is in `backend/shared/schema/`; run migrations 001-013 once.
 
 **Users table (auth):**
 - `userID` (SERIAL PRIMARY KEY)
@@ -116,16 +117,22 @@ The same PostgreSQL database is used by auth-service and all app services. Schem
 - `email` (VARCHAR(50) UNIQUE NOT NULL)
 - `role` (VARCHAR(10)) - 'admin' or 'tech'
 
-App services use additional tables for customers, tickets, orders, quotes, invoices, items, and related data; see the SQL files in `backend/shared/schema/`.
+App services use additional tables for customers, tickets, orders, quotes, invoices, items, purchase orders, and related data. Notable schema elements: `purchase_orders` / `purchase_order_lines`; `invoice_payments.reference`; invoice `status` column removed; `unit_of_measure` on items and quote_order_lines; ticket id sequence. See the SQL files in `backend/shared/schema/`.
 
 ## Frontend
 
 The frontend is a single-page application with protected routes. Login persists the JWT and user in AuthContext (and localStorage). The authenticated layout (AppLayout) includes:
 
-- A collapsible sidebar with Lucide icons (Home, Customers, Tickets, Orders, Invoices, Items, Admin)
-- A header with global search (debounced input, grouped results: customers, tickets, orders/quotes, invoices, items) and a profile dropdown (logged-in user, logout)
+- A collapsible sidebar with Lucide icons (Home, Customers, Tickets, Orders, Invoices, Purchasing, Items, Admin)
+- A header with global search (pill-shaped, debounced input; grouped results: customers, tickets, orders/quotes, invoices, items) and a profile dropdown (logged-in user, logout)
 
-**Pages:** Landing, Customers, Customer detail, Tickets, Ticket detail, Orders (and quotes), Order/Quote detail, Invoices, Invoice detail, Items (admin), Admin (users).
+**Routes:** `/` (Landing), `/customers`, `/customers/new`, `/customers/:id`, `/tickets`, `/tickets/new`, `/tickets/:id`, `/tickets/:id/edit`, `/orders`, `/orders/:id`, `/orders/:id/billing`, `/invoices`, `/invoices/bill-order`, `/invoices/:id`, `/purchasing`, `/purchasing/:id`, `/items`, `/items/new`, `/items/:id`, `/items/:id/edit`, `/admin`, `/admin/users/new`. Quotes redirect to orders.
+
+**Pages:** Landing, Customers, Customer form/detail, Tickets, Ticket form/detail/edit, Orders (and quotes), Order/Quote detail, Billing (per order), Invoices, Bill order, Invoice detail, Purchasing, Purchase order detail, Items (list/form/detail/edit), Admin (users, create user).
+
+**Billing:** Bill order flow (`/invoices/bill-order`) creates an invoice from an order; order billing page at `/orders/:id/billing`.
+
+**UI:** Pill-shaped primary/secondary/icon and filter tab buttons; filter tabs (Open/Closed/All) and customer filter on list pages; plus button aligned with filters on Orders, Tickets, Invoices; shared ErrorBanner, BackArrow, TicketSelector; `formatDate` and `api/client`, `useListFetch`/`useDetailFetch` hooks.
 
 **Styling:** Grid-based layout; compact table columns (e.g. col-id, col-date, col-status, col-amount) on list pages; short-field styling for IDs, dates, and amounts on detail views.
 
