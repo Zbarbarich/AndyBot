@@ -15,6 +15,7 @@ interface Line {
   unit_price: number;
   sort_order: number;
   billing_status: string;
+  quantity_billed?: number;
   item_sku?: string;
   item_name?: string;
 }
@@ -40,6 +41,8 @@ const BillingPage = () => {
   const [creatingInvoice, setCreatingInvoice] = useState(false);
   const [patchingLineId, setPatchingLineId] = useState<number | null>(null);
   const [additionalShipping, setAdditionalShipping] = useState('');
+  /** Per-line quantity to invoice (for billable lines). Key = line id, value = qty to bill. */
+  const [billableQty, setBillableQty] = useState<Record<number, number>>({});
 
   const fetchOrder = useCallback(async () => {
     if (!id) return;
@@ -71,6 +74,26 @@ const BillingPage = () => {
   useEffect(() => {
     fetchOrder();
   }, [fetchOrder]);
+
+  // Default billable qty to remaining for each billable line when order lines load/change
+  useEffect(() => {
+    if (!order?.lines) return;
+    setBillableQty((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      for (const line of order.lines) {
+        if (line.billing_status !== 'billable') continue;
+        const qty = Number(line.quantity);
+        const billed = Number(line.quantity_billed ?? 0);
+        const remaining = Math.max(0, qty - billed);
+        if (remaining > 0 && next[line.id] === undefined) {
+          next[line.id] = remaining;
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [order?.lines]);
 
   const updateLineBillingStatus = async (lineId: number, billing_status: 'pending' | 'billable') => {
     if (!order) return;
@@ -108,10 +131,25 @@ const BillingPage = () => {
     setError('');
     try {
       const addShip = parseFloat(additionalShipping);
+      const billableLines = order.lines.filter((l) => l.billing_status === 'billable');
+      const remaining = (line: Line) => {
+        const qty = Number(line.quantity);
+        const billed = Number(line.quantity_billed ?? 0);
+        return Math.max(0, qty - billed);
+      };
+      const lines = billableLines
+        .filter((l) => remaining(l) > 0)
+        .map((l) => ({
+          line_id: l.id,
+          quantity: Math.min(Math.max(1, Math.floor(billableQty[l.id] ?? remaining(l))), remaining(l)),
+        }));
       const res = await authFetch(`${ORDERS_API}/${order.id}/invoices`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ additional_shipping: Number.isFinite(addShip) ? addShip : 0 }),
+        body: JSON.stringify({
+          additional_shipping: Number.isFinite(addShip) ? addShip : 0,
+          lines: lines.length > 0 ? lines : undefined,
+        }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Failed to create invoice');
@@ -176,34 +214,61 @@ const BillingPage = () => {
               <th>Unit price</th>
               <th>Extended</th>
               <th>Billing status</th>
+              <th>Billable qty</th>
             </tr>
           </thead>
           <tbody className="text-dark-text">
-            {order.lines.map((line) => (
-              <tr key={line.id}>
-                <td className="min-w-[160px]">
-                  {line.item_sku && line.item_name ? `${line.item_sku} – ${line.item_name}` : (line.description || '—')}
-                </td>
-                <td>{Number(line.quantity)}</td>
-                <td>{Number(line.unit_price).toFixed(2)}</td>
-                <td className="whitespace-nowrap">{(Number(line.quantity) * Number(line.unit_price)).toFixed(2)}</td>
-                <td>
-                  {line.billing_status === 'invoiced' ? (
-                    <span className="text-dark-text-muted">Invoiced</span>
-                  ) : (
-                    <select
-                      value={line.billing_status}
-                      onChange={(e) => updateLineBillingStatus(line.id, e.target.value as 'pending' | 'billable')}
-                      disabled={patchingLineId === line.id}
-                      className="input-field w-full max-w-[120px]"
-                    >
-                      <option value="pending">Unbilled</option>
-                      <option value="billable">Billed</option>
-                    </select>
-                  )}
-                </td>
-              </tr>
-            ))}
+            {order.lines.map((line) => {
+              const qty = Number(line.quantity);
+              const billed = Number(line.quantity_billed ?? 0);
+              const remaining = Math.max(0, qty - billed);
+              const toBill = billableQty[line.id] ?? remaining;
+              return (
+                <tr key={line.id}>
+                  <td className="min-w-[160px]">
+                    {line.item_sku && line.item_name ? `${line.item_sku} – ${line.item_name}` : (line.description || '—')}
+                  </td>
+                  <td>{qty}</td>
+                  <td>{Number(line.unit_price).toFixed(2)}</td>
+                  <td className="whitespace-nowrap">{(qty * Number(line.unit_price)).toFixed(2)}</td>
+                  <td>
+                    {line.billing_status === 'invoiced' ? (
+                      <span className="text-dark-text-muted">Invoiced</span>
+                    ) : (
+                      <select
+                        value={line.billing_status}
+                        onChange={(e) => updateLineBillingStatus(line.id, e.target.value as 'pending' | 'billable')}
+                        disabled={patchingLineId === line.id}
+                        className="input-field w-full max-w-[120px]"
+                      >
+                        <option value="pending">Unbilled</option>
+                        <option value="billable">Billed</option>
+                      </select>
+                    )}
+                  </td>
+                  <td>
+                    {line.billing_status === 'invoiced' ? (
+                      <span className="text-dark-text-muted">—</span>
+                    ) : line.billing_status === 'billable' && remaining > 0 ? (
+                      <input
+                        type="number"
+                        min={1}
+                        max={remaining}
+                        step={1}
+                        value={toBill}
+                        onChange={(e) => {
+                          const v = e.target.value === '' ? remaining : Math.min(remaining, Math.max(1, parseFloat(e.target.value) || 0));
+                          setBillableQty((prev) => ({ ...prev, [line.id]: v }));
+                        }}
+                        className="input-field w-20 min-h-0 py-1.5 px-2 text-right"
+                      />
+                    ) : (
+                      <span className="text-dark-text-muted">—</span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

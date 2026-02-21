@@ -25,6 +25,18 @@ const purchaseOrderQueries = {
     ORDER BY po.id DESC
   `,
 
+  search: `
+    SELECT po.id, po.po_number, po.order_id, po.created_at, po.status,
+           q.document_number AS order_document_number,
+           c.name AS customer_name
+    FROM purchase_orders po
+    JOIN quotes_orders q ON q.id = po.order_id
+    JOIN customers c ON c.id = q.customer_id
+    WHERE po.po_number ILIKE $1 OR q.document_number ILIKE $1 OR c.name ILIKE $1 OR po.id::text = $2
+    ORDER BY po.id DESC
+    LIMIT 20
+  `,
+
   getById: `
     SELECT po.id, po.po_number, po.order_id, po.created_at, po.status,
            q.document_number AS order_document_number
@@ -52,6 +64,11 @@ const purchaseOrderQueries = {
 
   updateStatus: `
     UPDATE purchase_orders SET status = $2 WHERE id = $1 RETURNING id, po_number, order_id, created_at, status
+  `,
+
+  /** Quote order line IDs that are already on a purchase order (for "line PO'd once per order" check) */
+  linesAlreadyOnPo: `
+    SELECT quote_order_line_id FROM purchase_order_lines WHERE quote_order_line_id = ANY($1::int[])
   `,
 };
 

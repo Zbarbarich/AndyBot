@@ -160,8 +160,8 @@ const TicketFormPage = () => {
           <textarea
             value={form.description}
             onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-            className="input-field min-h-[100px]"
-            rows={4}
+            className="input-field min-h-[8rem]"
+            rows={6}
           />
         </div>
         <div className="flex flex-wrap gap-2 pt-2">

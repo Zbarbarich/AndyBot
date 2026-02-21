@@ -155,6 +155,7 @@ async function searchAggregate(req: AuthRequest, res: Response): Promise<void> {
   const orderUrl = (process.env.ORDER_SERVICE_URL || 'http://localhost:3005') + '/api/app/orders/search';
   const invoiceUrl = (process.env.INVOICE_SERVICE_URL || 'http://localhost:3006') + '/api/app/invoices/search';
   const itemUrl = (process.env.ORDER_SERVICE_URL || 'http://localhost:3005') + '/api/app/items/search';
+  const purchaseOrderUrl = (process.env.ORDER_SERVICE_URL || 'http://localhost:3005') + '/api/app/purchase-orders/search';
   const opts = { headers: { Authorization: authHeader } };
 
   const fetchJson = async (url: string): Promise<unknown[]> => {
@@ -168,15 +169,16 @@ async function searchAggregate(req: AuthRequest, res: Response): Promise<void> {
     }
   };
 
-  const [customers, tickets, orders, invoices, items] = await Promise.all([
+  const [customers, tickets, orders, invoices, items, purchase_orders] = await Promise.all([
     fetchJson(customerUrl),
     fetchJson(ticketUrl),
     fetchJson(orderUrl),
     fetchJson(invoiceUrl),
     fetchJson(itemUrl),
+    fetchJson(purchaseOrderUrl),
   ]);
 
-  res.json({ customers, tickets, orders, invoices, items });
+  res.json({ customers, tickets, orders, invoices, items, purchase_orders });
 }
 
 router.use("/api/auth", authProxy);

@@ -3,7 +3,7 @@ const quoteOrderQueries = {
     SELECT q.id, q.document_number, q.type, q.customer_id, q.ticket_id, q.status, q.valid_until, q.order_date, q.notes,
            q.customer_po_number, q.original_quote_id,
            q.subtotal, q.tax_rate, q.tax_amount, q.shipping_amount, q.total, q.created_at, q.updated_at,
-           c.name AS customer_name
+           c.name AS customer_name, c.contact_name AS customer_contact_name, c.physical_address AS customer_address
     FROM quotes_orders q
     JOIN customers c ON c.id = q.customer_id
     WHERE q.id = $1

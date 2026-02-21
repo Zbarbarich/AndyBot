@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Search, Users, Ticket, FileText, Receipt, Package } from 'lucide-react';
+import { Search, Users, Ticket, FileText, Receipt, Package, ShoppingCart } from 'lucide-react';
 import { authFetch } from '../api/client';
 import { apiBase } from '../api/config';
 
@@ -12,6 +12,7 @@ interface SearchResults {
   orders: { id: number; document_number: string; type: string; customer_name?: string }[];
   invoices: { id: number; invoice_number: string; customer_name?: string }[];
   items: { id: number; sku: string; name: string }[];
+  purchase_orders: { id: number; po_number: string; order_document_number?: string; customer_name?: string }[];
 }
 
 const DEBOUNCE_MS = 300;
@@ -41,7 +42,7 @@ export default function GlobalSearch({ getToken, className = '', placeholder = '
     try {
       const res = await authFetch(`${API_BASE}/search?q=${encodeURIComponent(q)}`);
       if (!res.ok) {
-        setResults({ customers: [], tickets: [], orders: [], invoices: [], items: [] });
+        setResults({ customers: [], tickets: [], orders: [], invoices: [], items: [], purchase_orders: [] });
         return;
       }
       const data = await res.json();
@@ -51,9 +52,10 @@ export default function GlobalSearch({ getToken, className = '', placeholder = '
         orders: data.orders ?? [],
         invoices: data.invoices ?? [],
         items: data.items ?? [],
+        purchase_orders: data.purchase_orders ?? [],
       });
     } catch {
-      setResults({ customers: [], tickets: [], orders: [], invoices: [], items: [] });
+      setResults({ customers: [], tickets: [], orders: [], invoices: [], items: [], purchase_orders: [] });
     } finally {
       setLoading(false);
     }
@@ -97,7 +99,8 @@ export default function GlobalSearch({ getToken, className = '', placeholder = '
     results.tickets.length > 0 ||
     results.orders.length > 0 ||
     results.invoices.length > 0 ||
-    results.items.length > 0
+    results.items.length > 0 ||
+    results.purchase_orders.length > 0
   );
 
   const handleLinkClick = (path: string) => {
@@ -211,6 +214,25 @@ export default function GlobalSearch({ getToken, className = '', placeholder = '
                   ))}
                 </div>
               )}
+              {results!.purchase_orders.length > 0 && (
+                <div className="px-3 py-1">
+                  <div className="flex items-center gap-2 text-xs font-medium text-dark-text-muted uppercase tracking-wide mb-1">
+                    <ShoppingCart className="w-3.5 h-3.5" />
+                    Purchase orders
+                  </div>
+                  {results!.purchase_orders.map((po) => (
+                    <Link
+                      key={po.id}
+                      to={`/purchase-orders/${po.id}`}
+                      onClick={() => handleLinkClick(`/purchase-orders/${po.id}`)}
+                      className="block px-3 py-2 rounded hover:bg-dark-surface-elevated text-dark-text text-sm"
+                      role="option"
+                    >
+                      PO {po.po_number} {po.order_document_number ? `– Order ${po.order_document_number}` : ''} {po.customer_name ? `– ${po.customer_name}` : ''}
+                    </Link>
+                  ))}
+                </div>
+              )}
               {results!.items.length > 0 && (
                 <div className="px-3 py-1">
                   <div className="flex items-center gap-2 text-xs font-medium text-dark-text-muted uppercase tracking-wide mb-1">
@@ -220,11 +242,8 @@ export default function GlobalSearch({ getToken, className = '', placeholder = '
                   {results!.items.map((i) => (
                     <Link
                       key={i.id}
-                      to={`/items`}
-                      onClick={() => {
-                        handleLinkClick('/items');
-                        onResultClick?.();
-                      }}
+                      to={`/items/${i.id}`}
+                      onClick={() => handleLinkClick(`/items/${i.id}`)}
                       className="block px-3 py-2 rounded hover:bg-dark-surface-elevated text-dark-text text-sm"
                       role="option"
                     >

@@ -24,7 +24,7 @@ const itemQueries = {
 
   create: `
     INSERT INTO items (sku, name, category, description, unit_price, taxable, stock, our_cost, unit_of_measure)
-    VALUES ($1, $2, $3, $4, $5, $6, COALESCE($7, 0), COALESCE($8, 0), COALESCE(NULLIF(TRIM($9), ''), 'EA'))
+    VALUES ($1, $2, $3, $4, $5::numeric, $6, $7::numeric, $8::numeric, COALESCE(NULLIF(TRIM($9), ''), 'EA'))
     RETURNING id, sku, name, category, description, unit_price, taxable, stock, our_cost, unit_of_measure, created_at, updated_at
   `,
 

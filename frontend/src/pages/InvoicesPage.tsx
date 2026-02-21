@@ -41,13 +41,13 @@ const InvoicesPage = () => {
     <div className="page-container">
       <ErrorBanner message={error} />
 
-      <div className="flex flex-wrap items-center gap-1.5 mb-2">
+      <div className="flex flex-nowrap items-center gap-2 mb-2">
         {(['open', 'closed', 'all'] as const).map((tab) => (
           <button
             key={tab}
             type="button"
             onClick={() => setStatusFilter(tab)}
-            className={`pill-button ${statusFilter === tab ? 'active' : ''}`}
+            className={`pill-button shrink-0 ${statusFilter === tab ? 'active' : ''}`}
           >
             {tab === 'open' ? 'Unpaid' : tab === 'closed' ? 'Paid' : tab}
           </button>
@@ -57,13 +57,13 @@ const InvoicesPage = () => {
           value={customerFilter}
           onChange={(e) => setCustomerFilter(e.target.value)}
           placeholder="Customer..."
-          className="filter-search-input"
+          className="filter-search-input flex-1 min-w-0"
           aria-label="Filter by customer"
         />
         <button
           type="button"
           onClick={() => navigate('/invoices/bill-order')}
-          className="btn-icon-primary ml-auto"
+          className="btn-icon-primary shrink-0"
           aria-label="Bill an order"
         >
           <Plus className="w-5 h-5" />

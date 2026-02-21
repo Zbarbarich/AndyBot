@@ -1,13 +1,17 @@
 /**
- * Format a date string (ISO YYYY-MM-DD or parseable) as mm/dd/yyyy for display.
+ * Format a date string (ISO or parseable) as mm/dd/yyyy in America/New_York.
  * Returns '—' for null/empty/invalid.
  */
+const NY_DATE_OPTIONS: Intl.DateTimeFormatOptions = {
+  timeZone: 'America/New_York',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+};
+
 export function formatDate(value: string | null | undefined): string {
   if (value == null || value === '') return '—';
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return '—';
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  const year = d.getFullYear();
-  return `${month}/${day}/${year}`;
+  return new Intl.DateTimeFormat('en-US', NY_DATE_OPTIONS).format(d);
 }

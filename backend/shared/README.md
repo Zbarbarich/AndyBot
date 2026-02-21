@@ -6,7 +6,7 @@ These migrations are run once against the single PostgreSQL database used by aut
 
 Run the SQL migrations once against your PostgreSQL database, in order.
 
-**001–006 (foundation):**
+**001–013 (foundation through invoice payment reference):**
 
 ```bash
 psql -h localhost -p 5419 -U postgres -d TheNineteenthChamber -f schema/001_customers_tickets.sql
@@ -33,7 +33,19 @@ Replace host/port/user/database if your setup differs.
 
 **013** — `013_invoice_payment_reference.sql`: Adds `reference` to `invoice_payments` (e.g. check number).
 
-### Using the app's DB config (006–011)
+**014** — `014_customer_contact.sql`: Adds `contact_name` to customers.
+
+**015** — `015_quantity_billed.sql`: Adds `quantity_billed` to quote_order_lines (partial billing).
+
+**016** — `016_items_decimal_columns.sql`: Ensures items `stock` and `our_cost` are numeric.
+
+**017** — `017_order_deposits.sql`: Creates `order_deposits` (order-level deposits applied to next invoice).
+
+**018** — `018_clear_orders_and_invoices_data.sql`: Clears orders, invoices, POs, deposits, invoice payments; resets sequences. Run with `cd backend/order-service && NODE_PATH=./node_modules node ../scripts/run-migration-018.js`.
+
+**019** — `019_drop_redundant_indexes.sql`: Drops `idx_items_sku` and `idx_quotes_orders_document_number`. Run with `cd backend/order-service && NODE_PATH=./node_modules node ../scripts/run-migration-019.js`.
+
+### Using the app's DB config (006–019)
 
 From the repo root, run a migration with the same credentials the backend uses:
 
@@ -41,7 +53,7 @@ From the repo root, run a migration with the same credentials the backend uses:
 cd backend/auth-service && NODE_PATH=./node_modules node ../scripts/run-migration-006.js
 ```
 
-Replace `run-migration-006.js` with `run-migration-007.js` … `run-migration-011.js` as needed. These load `.env` from auth-service and apply the corresponding SQL. Run in order; 007 is optional and destructive. For 012 and 013, run the SQL with psql (or add small runners if desired).
+Replace `run-migration-006.js` with `run-migration-007.js` … `run-migration-019.js` as needed. Scripts 014–019 load `.env` from order-service (or auth-service) and apply the corresponding SQL. Run in order; 007 and 018 are optional (018 clears order/invoice data). For 012 and 013 use psql or the existing runners.
 
 After a fresh start (007), re-create quotes/orders/invoices with:
 

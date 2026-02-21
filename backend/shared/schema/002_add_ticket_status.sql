@@ -6,5 +6,4 @@ ALTER TABLE tickets
 -- ALTER TABLE tickets DROP CONSTRAINT IF EXISTS tickets_status_check;
 -- ALTER TABLE tickets ADD CONSTRAINT tickets_status_check
 --   CHECK (status IN ('Open', 'Pending Closure Review', 'Closed'));
-
-CREATE INDEX IF NOT EXISTS idx_tickets_status ON tickets(status);
+-- Note: idx_tickets_status is created in 001_customers_tickets.sql; no duplicate here.

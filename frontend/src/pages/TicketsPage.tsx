@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import { authFetch } from '../api/client';
 import { apiBase } from '../api/config';
+import { formatDate } from '../utils/formatDate';
 
 const API_BASE = `${apiBase}/api/app/tickets`;
 const ORDERS_API = `${apiBase}/api/app/orders`;
@@ -98,13 +99,13 @@ const TicketsPage = () => {
         </div>
       )}
 
-      <div className="flex flex-wrap items-center gap-1.5 mb-2">
+      <div className="flex flex-nowrap items-center gap-2 mb-2">
         {(['open', 'closed', 'all'] as const).map((tab) => (
           <button
             key={tab}
             type="button"
             onClick={() => setStatusFilter(tab)}
-            className={`pill-button ${statusFilter === tab ? 'active' : ''}`}
+            className={`pill-button shrink-0 ${statusFilter === tab ? 'active' : ''}`}
           >
             {tab}
           </button>
@@ -114,13 +115,13 @@ const TicketsPage = () => {
           value={customerFilter}
           onChange={(e) => setCustomerFilter(e.target.value)}
           placeholder="Customer..."
-          className="filter-search-input"
+          className="filter-search-input flex-1 min-w-0"
           aria-label="Filter by customer"
         />
         <button
           type="button"
           onClick={() => navigate('/tickets/new')}
-          className="btn-icon-primary ml-auto"
+          className="btn-icon-primary shrink-0"
           aria-label="New ticket"
         >
           <Plus className="w-5 h-5" />
@@ -153,7 +154,7 @@ const TicketsPage = () => {
                     onClick={() => navigate(`/tickets/${t.id}`)}
                   >
                     <td className="col-id font-mono">{t.id}</td>
-                    <td className="col-date whitespace-nowrap">{new Date(t.creation_date).toLocaleDateString()}</td>
+                    <td className="col-date whitespace-nowrap">{formatDate(t.creation_date)}</td>
                     <td className="font-medium max-w-[200px] truncate sm:max-w-none">{t.subject}</td>
                     <td>{t.customer_name ?? (t.email ?? '—')}</td>
                     <td className="col-status">{t.category ?? '—'}</td>

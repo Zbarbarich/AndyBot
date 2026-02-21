@@ -44,6 +44,37 @@ export const verifyUserContext = async (
   }
 };
 
+/** Optional auth: sets req.user when token/context present; does not 401 when absent (for first-user create). */
+export const optionalVerifyUserContext = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const userContext = req.headers['x-user-context'] as string;
+    if (userContext) {
+      req.user = JSON.parse(userContext);
+      next();
+      return;
+    }
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) {
+      next();
+      return;
+    }
+    const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as {
+      email: string;
+      role: string;
+      userID: number;
+    };
+    req.user = decoded;
+    next();
+  } catch (error) {
+    console.error('Auth middleware optionalVerifyUserContext error', error);
+    next();
+  }
+};
+
 export const isAdmin = async (
   req: AuthRequest,
   res: Response,

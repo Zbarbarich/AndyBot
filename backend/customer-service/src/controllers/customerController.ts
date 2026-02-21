@@ -35,10 +35,46 @@ export const customerController = {
     }
   },
 
+  async getPaymentHistory(req: AppRequest, res: Response): Promise<void> {
+    try {
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) {
+        res.status(400).json({ error: 'Invalid customer id' });
+        return;
+      }
+      const custResult = await query(customerQueries.getById, [id]);
+      if (custResult.rows.length === 0) {
+        res.status(404).json({ error: 'Customer not found' });
+        return;
+      }
+      const [invPayments, deposits] = await Promise.all([
+        query(customerQueries.paymentHistoryInvoicePayments, [id]),
+        query(customerQueries.paymentHistoryOrderDeposits, [id]),
+      ]);
+      const invRows = (invPayments.rows as Record<string, unknown>[]).map((r) => ({
+        ...r,
+        applied_to_invoice_id: null,
+        applied_invoice_number: null,
+      }));
+      const depRows = deposits.rows as Record<string, unknown>[];
+      const combined: Record<string, unknown>[] = [...invRows, ...depRows];
+      combined.sort((a, b) => {
+        const ta = new Date((a.paid_at as string) || 0).getTime();
+        const tb = new Date((b.paid_at as string) || 0).getTime();
+        return tb - ta;
+      });
+      res.json(combined);
+    } catch (e) {
+      console.error('customerController.getPaymentHistory', e);
+      res.status(500).json({ error: 'Failed to fetch payment history' });
+    }
+  },
+
   async create(req: AppRequest, res: Response): Promise<void> {
     try {
       const {
         name,
+        contact_name,
         physical_address,
         email,
         phone,
@@ -51,6 +87,7 @@ export const customerController = {
       }
       const result = await query(customerQueries.create, [
         name.trim(),
+        contact_name != null && typeof contact_name === 'string' ? contact_name.trim() || null : null,
         physical_address ?? null,
         email ?? null,
         phone ?? null,
@@ -58,8 +95,13 @@ export const customerController = {
         !!text_notifications,
       ]);
       res.status(201).json(result.rows[0]);
-    } catch (e) {
+    } catch (e: unknown) {
       console.error('customerController.create', e);
+      const err = e as { code?: string };
+      if (err.code === '23505') {
+        res.status(400).json({ error: 'A customer with this email already exists.' });
+        return;
+      }
       res.status(500).json({ error: 'Failed to create customer' });
     }
   },
@@ -73,6 +115,7 @@ export const customerController = {
       }
       const {
         name,
+        contact_name,
         physical_address,
         email,
         phone,
@@ -82,6 +125,7 @@ export const customerController = {
       const result = await query(customerQueries.update, [
         id,
         name ?? undefined,
+        contact_name !== undefined ? (contact_name != null && typeof contact_name === 'string' ? contact_name.trim() || null : null) : undefined,
         physical_address ?? undefined,
         email ?? undefined,
         phone ?? undefined,
@@ -93,8 +137,13 @@ export const customerController = {
         return;
       }
       res.json(result.rows[0]);
-    } catch (e) {
+    } catch (e: unknown) {
       console.error('customerController.update', e);
+      const err = e as { code?: string };
+      if (err.code === '23505') {
+        res.status(400).json({ error: 'A customer with this email already exists.' });
+        return;
+      }
       res.status(500).json({ error: 'Failed to update customer' });
     }
   },

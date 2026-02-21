@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { authFetch } from '../api/client';
 import { BackArrow } from '../components/BackArrow';
 import { apiBase } from '../api/config';
+import { formatDate } from '../utils/formatDate';
 
 const TICKETS_API = `${apiBase}/api/app/tickets`;
 const CUSTOMERS_API = `${apiBase}/api/app/customers`;
@@ -388,7 +389,7 @@ const TicketDetailPage = () => {
                     }`}
                   >
                     <p className="text-dark-text text-sm whitespace-pre-wrap">{u.content}</p>
-                    <p className="text-dark-text-muted text-xs mt-2">{new Date(u.created_at).toLocaleString()}</p>
+                    <p className="text-dark-text-muted text-xs mt-2">{formatDate(u.created_at)}</p>
                   </div>
                 ))
               )}
@@ -399,9 +400,9 @@ const TicketDetailPage = () => {
                 <textarea
                   value={resolutionInput}
                   onChange={(e) => setResolutionInput(e.target.value)}
-                  className="input-field min-h-[80px] w-full"
+                  className="input-field min-h-[8rem] w-full"
                   placeholder="Type an update..."
-                  rows={3}
+                  rows={5}
                 />
                 <button
                   type="submit"
@@ -476,7 +477,7 @@ const TicketDetailPage = () => {
                 <div><dt className="text-dark-text-muted text-xs">ID</dt><dd className="font-mono">{ticket.id}</dd></div>
                 <div><dt className="text-dark-text-muted text-xs">Status</dt><dd className="font-medium">{ticket.status}</dd></div>
                 <div><dt className="text-dark-text-muted text-xs">Priority</dt><dd>{ticket.priority}</dd></div>
-                <div><dt className="text-dark-text-muted text-xs">Created</dt><dd className="whitespace-nowrap">{new Date(ticket.creation_date).toLocaleString()}</dd></div>
+                <div><dt className="text-dark-text-muted text-xs">Created</dt><dd className="whitespace-nowrap">{formatDate(ticket.creation_date)}</dd></div>
                 <div><dt className="text-dark-text-muted text-xs">Category</dt><dd>{ticket.category ?? '—'}</dd></div>
                 <div><dt className="text-dark-text-muted text-xs">Subject</dt><dd className="font-medium">{ticket.subject}</dd></div>
               </dl>
@@ -499,9 +500,9 @@ const TicketDetailPage = () => {
             <textarea
               value={finalResolution}
               onChange={(e) => setFinalResolution(e.target.value)}
-              className="input-field min-h-[100px] w-full"
+              className="input-field min-h-[8rem] w-full"
               placeholder="Final resolution..."
-              rows={4}
+              rows={6}
             />
             <div className="flex flex-col-reverse sm:flex-row gap-2 mt-6">
               <button

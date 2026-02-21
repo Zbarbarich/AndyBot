@@ -4,6 +4,7 @@ import { authFetch } from '../api/client';
 import { BackArrow } from '../components/BackArrow';
 import { useDetailFetch } from '../hooks/useDetailFetch';
 import { apiBase } from '../api/config';
+import { formatDate } from '../utils/formatDate';
 
 const INVOICES_API = `${apiBase}/api/app/invoices`;
 
@@ -251,7 +252,7 @@ const InvoiceDetailPage = () => {
             <ul className="space-y-1 text-sm text-dark-text">
               {invoice.payments.map((p) => (
                 <li key={p.id} className="flex flex-wrap gap-x-4 py-0.5 border-b border-dark-border/50">
-                  <span className="font-mono">{new Date(p.paid_at).toLocaleDateString()}</span>
+                  <span className="font-mono">{formatDate(p.paid_at)}</span>
                   <span className="font-mono">{Number(p.amount).toFixed(2)}</span>
                   <span>{p.payment_method ?? '—'}{p.reference ? ` ${p.reference}` : ''}</span>
                 </li>

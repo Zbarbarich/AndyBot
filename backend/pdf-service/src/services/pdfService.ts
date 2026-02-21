@@ -3,10 +3,51 @@ import { Response } from 'express';
 
 const COMPANY_NAME = process.env.COMPANY_NAME || '19th Chamber';
 const COMPANY_LOGO_URL = process.env.COMPANY_LOGO_URL || '';
+const COMPANY_ADDRESS = [
+  process.env.COMPANY_ADDRESS_LINE1 || '106 Packer Street',
+  process.env.COMPANY_CITY_STATE_ZIP || 'Johnstown PA 15904',
+];
 
 const PAGE_WIDTH = 595;
 const PAGE_MARGIN = 50;
 const CONTENT_WIDTH = PAGE_WIDTH - PAGE_MARGIN * 2;
+
+/** Format date as mm/dd/yyyy in America/New_York for PDF output. */
+function formatDatePdf(dateStr: string | null | undefined): string {
+  if (!dateStr) return '—';
+  try {
+    const d = new Date(dateStr);
+    if (Number.isNaN(d.getTime())) return '—';
+    return new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/New_York',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(d);
+  } catch {
+    return String(dateStr);
+  }
+}
+
+const DOC_INFO_BLOCK_WIDTH = 180;
+const DOC_INFO_TOP = 50;
+const DOC_INFO_LINE_HEIGHT = 14;
+
+/** Draw document info block at top right with labeled lines (e.g. "Quote #", "Valid through:", "Page"). Returns y after block. */
+function drawDocInfoBlockRight(
+  doc: PDFDoc,
+  lines: Array<{ label: string; value: string }>
+): number {
+  const x = PAGE_WIDTH - PAGE_MARGIN - DOC_INFO_BLOCK_WIDTH;
+  let y = DOC_INFO_TOP;
+  doc.fontSize(10);
+  for (const { label, value } of lines) {
+    const line = `${label} ${value}`;
+    doc.font('Helvetica').text(line, x, y, { width: DOC_INFO_BLOCK_WIDTH, align: 'right' });
+    y += DOC_INFO_LINE_HEIGHT;
+  }
+  return y + 8;
+}
 
 interface DocLine {
   description: string | null;
@@ -25,6 +66,8 @@ export interface DocData {
   document_number: string;
   type: string;
   customer_name: string;
+  customer_address?: string | null;
+  contact_name?: string | null;
   customer_id?: number;
   valid_until?: string | null;
   order_date?: string | null;
@@ -44,28 +87,77 @@ export interface DocData {
 
 type PDFDoc = InstanceType<typeof PDFDocument>;
 
-async function addCompanyHeader(doc: PDFDoc): Promise<number> {
-  doc.fontSize(11).font('Helvetica-Bold').text(COMPANY_NAME, PAGE_MARGIN, 50);
-  let y = 72;
+/**
+ * Split a single address string into [street, cityStateZip] for two-line display.
+ * Street (address before city) on line 1; city, state zip on line 2.
+ * Uses first newline if present; otherwise splits on first ", " so street is before city.
+ */
+function splitAddressLines(addr: string): [string, string] {
+  const t = addr.trim();
+  if (!t) return ['', ''];
+  const nl = t.indexOf('\n');
+  if (nl >= 0) {
+    const street = t.slice(0, nl).trim();
+    const cityStateZip = t.slice(nl + 1).replace(/\n/g, ' ').trim();
+    return [street, cityStateZip];
+  }
+  const firstComma = t.indexOf(', ');
+  if (firstComma >= 0) {
+    return [t.slice(0, firstComma).trim(), t.slice(firstComma + 2).trim()];
+  }
+  return [t, ''];
+}
+
+/** Draw customer address as two lines (street, then city/state/zip). Returns y after block. */
+function drawCustomerAddressBlock(
+  doc: PDFDoc,
+  y: number,
+  addressStr: string | null | undefined,
+  width: number,
+  align: 'left' | 'right' = 'left'
+): number {
+  if (!addressStr || !addressStr.trim()) return y + 8;
+  const [street, cityStateZip] = splitAddressLines(addressStr);
+  const opts = { width, align };
+  doc.fontSize(9);
+  if (street) {
+    doc.text(street, PAGE_MARGIN, y, opts);
+    y += doc.heightOfString(street, opts) + 4;
+  }
+  if (cityStateZip) {
+    doc.text(cityStateZip, PAGE_MARGIN, y, opts);
+    y += doc.heightOfString(cityStateZip, opts) + 8;
+  } else if (street) {
+    y += 8;
+  }
+  doc.fontSize(10);
+  return y;
+}
+
+/** Draw company name, optional logo, and address starting at startY. Returns y after block. */
+async function addCompanyHeader(doc: PDFDoc, startY: number): Promise<number> {
+  let y = startY;
+  doc.fontSize(11).font('Helvetica-Bold').text(COMPANY_NAME, PAGE_MARGIN, y);
+  y += 18;
   if (COMPANY_LOGO_URL) {
     try {
       const res = await fetch(COMPANY_LOGO_URL);
       if (res.ok) {
         const buf = await res.arrayBuffer();
-        doc.image(Buffer.from(buf), PAGE_MARGIN, 70, { width: 80 });
-        y = 155;
+        doc.image(Buffer.from(buf), PAGE_MARGIN, y - 8, { width: 80 });
+        y += 78;
       }
     } catch {
       // ignore logo load errors
     }
   }
+  doc.fontSize(9).font('Helvetica');
+  for (const line of COMPANY_ADDRESS) {
+    doc.text(line, PAGE_MARGIN, y);
+    y += 12;
+  }
+  y += 8;
   return y;
-}
-
-function drawCenteredTitle(doc: PDFDoc, title: string, startY: number): number {
-  doc.fontSize(16).font('Helvetica-Bold');
-  doc.text(title, 0, startY, { align: 'center', width: PAGE_WIDTH });
-  return startY + 28;
 }
 
 function drawBorderedTable(
@@ -102,31 +194,24 @@ function drawBorderedTable(
   return y;
 }
 
-function commonDocLayout(
-  doc: PDFDoc,
-  data: DocData,
-  docTypeTitle: string,
-  docNumberLabel: string,
-  dateLine: string,
-  startY: number
-): number {
-  let y = drawCenteredTitle(doc, docTypeTitle, startY);
-
-  doc.fontSize(10).font('Helvetica');
-  doc.text(`${docNumberLabel} ${data.document_number}`, PAGE_MARGIN, y, { width: CONTENT_WIDTH, align: 'right' });
-  y += 16;
-  doc.text(dateLine, PAGE_MARGIN, y, { width: CONTENT_WIDTH, align: 'right' });
-  y += 16;
+function commonDocLayout(doc: PDFDoc, data: DocData, startY: number): number {
+  let y = startY;
   if (data.customer_po_number) {
+    doc.fontSize(10).font('Helvetica');
     doc.text(`Customer PO: ${data.customer_po_number}`, PAGE_MARGIN, y, { width: CONTENT_WIDTH, align: 'right' });
     y += 16;
   }
-  y += 8;
 
   doc.font('Helvetica-Bold').text('Bill to:', PAGE_MARGIN, y);
   y += 18;
   doc.font('Helvetica').text(data.customer_name, PAGE_MARGIN, y);
-  y += 28;
+  y += 14;
+  if (data.contact_name) {
+    doc.text(data.contact_name, PAGE_MARGIN, y);
+    y += 14;
+  }
+  y = drawCustomerAddressBlock(doc, y, data.customer_address, CONTENT_WIDTH);
+  y += 12;
 
   const colWidths = [180, 32, 52, 72, 82];
   y = drawBorderedTable(
@@ -180,17 +265,15 @@ export async function streamQuotePdf(data: DocData, res: Response): Promise<void
   const { streamDone } = setupDoc(doc, 'Quote');
   doc.pipe(res);
 
-  let y = await addCompanyHeader(doc);
-  if (y < 100) y = 100;
+  drawDocInfoBlockRight(doc, [
+    { label: 'Quote #:', value: data.document_number },
+    { label: 'Valid through:', value: formatDatePdf(data.valid_until) },
+    { label: 'Page:', value: '1' },
+  ]);
+  let y = await addCompanyHeader(doc, DOC_INFO_TOP);
+  if (y < 140) y = 140;
 
-  y = commonDocLayout(
-    doc,
-    data,
-    'QUOTE',
-    'Quote #:',
-    `Valid until: ${data.valid_until ?? '—'}`,
-    y
-  );
+  y = commonDocLayout(doc, data, y);
 
   doc.end();
   await streamDone;
@@ -201,17 +284,15 @@ export async function streamOrderPdf(data: DocData, res: Response): Promise<void
   const { streamDone } = setupDoc(doc, 'Order');
   doc.pipe(res);
 
-  let y = await addCompanyHeader(doc);
-  if (y < 100) y = 100;
+  drawDocInfoBlockRight(doc, [
+    { label: 'Order #:', value: data.document_number },
+    { label: 'Order date:', value: formatDatePdf(data.order_date) },
+    { label: 'Page:', value: '1' },
+  ]);
+  let y = await addCompanyHeader(doc, DOC_INFO_TOP);
+  if (y < 140) y = 140;
 
-  y = commonDocLayout(
-    doc,
-    data,
-    'ORDER',
-    'Order #:',
-    `Order date: ${data.order_date ?? '—'}`,
-    y
-  );
+  y = commonDocLayout(doc, data, y);
 
   doc.end();
   await streamDone;
@@ -222,30 +303,25 @@ export async function streamInvoicePdf(data: DocData, res: Response): Promise<vo
   const { streamDone } = setupDoc(doc, 'Invoice');
   doc.pipe(res);
 
-  let y = await addCompanyHeader(doc);
-  if (y < 100) y = 100;
-
-  doc.fontSize(16).font('Helvetica-Bold');
-  doc.text('INVOICE', 0, y, { align: 'center', width: PAGE_WIDTH });
-  y += 28;
-
-  doc.fontSize(10).font('Helvetica');
-  doc.text(`Invoice #: ${data.document_number}`, PAGE_MARGIN, y, { width: CONTENT_WIDTH, align: 'right' });
-  y += 16;
-  doc.text(`Invoice date: ${data.invoice_date ?? '—'}`, PAGE_MARGIN, y, { width: CONTENT_WIDTH, align: 'right' });
-  y += 16;
-  doc.text(`Due date: ${data.due_date ?? '—'}`, PAGE_MARGIN, y, { width: CONTENT_WIDTH, align: 'right' });
-  y += 16;
-  if (data.customer_po_number) {
-    doc.text(`Customer PO: ${data.customer_po_number}`, PAGE_MARGIN, y, { width: CONTENT_WIDTH, align: 'right' });
-    y += 16;
-  }
-  y += 8;
+  drawDocInfoBlockRight(doc, [
+    { label: 'Invoice #:', value: data.document_number },
+    { label: 'Invoice date:', value: formatDatePdf(data.invoice_date) },
+    { label: 'Due date:', value: formatDatePdf(data.due_date) },
+    { label: 'Page:', value: '1' },
+  ]);
+  let y = await addCompanyHeader(doc, DOC_INFO_TOP);
+  if (y < 140) y = 140;
 
   doc.font('Helvetica-Bold').text('Bill to:', PAGE_MARGIN, y);
   y += 18;
   doc.font('Helvetica').text(data.customer_name, PAGE_MARGIN, y);
-  y += 28;
+  y += 14;
+  if (data.contact_name) {
+    doc.text(data.contact_name, PAGE_MARGIN, y);
+    y += 14;
+  }
+  y = drawCustomerAddressBlock(doc, y, data.customer_address, CONTENT_WIDTH);
+  y += 12;
 
   const colWidths = [180, 32, 52, 72, 82];
   y = drawBorderedTable(
@@ -283,7 +359,7 @@ export async function streamInvoicePdf(data: DocData, res: Response): Promise<vo
     y += 18;
     doc.font('Helvetica').fontSize(9);
     for (const p of data.payments) {
-      const d = p.paid_at ? new Date(p.paid_at).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' }) : '—';
+      const d = formatDatePdf(p.paid_at);
       doc.text(`${d}  ${Number(p.amount).toFixed(2)}  ${p.payment_method ?? '—'}`, PAGE_MARGIN, y, { width: CONTENT_WIDTH });
       y += 14;
     }
@@ -310,6 +386,8 @@ export interface POData {
   po_number: string;
   order_document_number: string;
   customer_name: string;
+  customer_address?: string | null;
+  contact_name?: string | null;
   created_at: string;
   lines: POLine[];
 }
@@ -319,22 +397,25 @@ export async function streamPurchaseOrderPdf(data: POData, res: Response): Promi
   const { streamDone } = setupDoc(doc, 'Purchase Order');
   doc.pipe(res);
 
-  let y = await addCompanyHeader(doc);
-  if (y < 100) y = 100;
-
-  doc.fontSize(16).font('Helvetica-Bold');
-  doc.text('PURCHASE ORDER', 0, y, { align: 'center', width: PAGE_WIDTH });
-  y += 28;
+  const poDateStr = data.created_at ? formatDatePdf(data.created_at) : '—';
+  drawDocInfoBlockRight(doc, [
+    { label: 'PO #:', value: data.po_number },
+    { label: 'Order:', value: data.order_document_number },
+    { label: 'Date:', value: poDateStr },
+    { label: 'Page:', value: '1' },
+  ]);
+  let y = await addCompanyHeader(doc, DOC_INFO_TOP);
+  if (y < 140) y = 140;
 
   doc.fontSize(10).font('Helvetica');
-  doc.text(`PO #: ${data.po_number}`, PAGE_MARGIN, y, { width: CONTENT_WIDTH, align: 'right' });
-  y += 16;
-  doc.text(`Order: ${data.order_document_number}`, PAGE_MARGIN, y, { width: CONTENT_WIDTH, align: 'right' });
-  y += 16;
-  doc.text(`Date: ${data.created_at ? new Date(data.created_at).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' }) : '—'}`, PAGE_MARGIN, y, { width: CONTENT_WIDTH, align: 'right' });
-  y += 16;
   doc.text(`Customer: ${data.customer_name}`, PAGE_MARGIN, y, { width: CONTENT_WIDTH, align: 'right' });
-  y += 28;
+  y += 14;
+  if (data.contact_name) {
+    doc.text(`Contact: ${data.contact_name}`, PAGE_MARGIN, y, { width: CONTENT_WIDTH, align: 'right' });
+    y += 14;
+  }
+  y = drawCustomerAddressBlock(doc, y, data.customer_address, CONTENT_WIDTH / 2, 'right');
+  y += 12;
 
   const colWidths = [200, 60, 80, 95];
   y = drawBorderedTable(

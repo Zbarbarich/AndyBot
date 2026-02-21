@@ -17,6 +17,11 @@ if (process.env.DB_SSL === "true") {
 
 const pool = new Pool(poolConfig);
 
+// All timestamps and CURRENT_DATE in this app are in Eastern (New York).
+pool.on("connect", (client) => {
+  void client.query("SET timezone = 'America/New_York'");
+});
+
 pool.connect((err, client, release) => {
   if (err) {
     console.error("Ticket-service DB connection failed. Check PostgreSQL and .env (DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD).");

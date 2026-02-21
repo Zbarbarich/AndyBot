@@ -3,6 +3,7 @@ import { query, pool } from '../config/db';
 import quoteOrderQueries from '../queries/quoteOrderQueries';
 import itemQueries from '../queries/itemQueries';
 import purchaseOrderQueries from '../queries/purchaseOrderQueries';
+import orderInvoiceQueries from '../queries/orderInvoiceQueries';
 import { AppRequest } from '../middleware/userContext';
 
 type LineInput = { item_id?: number; description?: string; quantity: number; unit_price: number; sort_order?: number; billing_status?: string; unit_of_measure?: string; include_in_po?: boolean; po_unit_cost?: number };
@@ -97,7 +98,28 @@ export const quoteOrderController = {
       }
       const doc = docResult.rows[0];
       const linesResult = await query(quoteOrderQueries.getLinesByQuoteOrderId, [id]);
-      res.json({ ...doc, lines: linesResult.rows });
+      let lines = linesResult.rows as Array<Record<string, unknown>>;
+
+      if (doc.type === 'order') {
+        const invLinesResult = await query(orderInvoiceQueries.getInvoiceLinesWithSubOrder, [id]);
+        const invLines = invLinesResult.rows as Array<{ order_line_id: number; qty_invoiced: string; sub_order_number: string; invoice_number: string }>;
+        const map = new Map<number, Array<{ sub_order_number: string; invoice_number: string; quantity: number }>>();
+        for (const r of invLines) {
+          const list = map.get(r.order_line_id) ?? [];
+          list.push({
+            sub_order_number: r.sub_order_number,
+            invoice_number: r.invoice_number,
+            quantity: Number(r.qty_invoiced),
+          });
+          map.set(r.order_line_id, list);
+        }
+        lines = lines.map((l) => {
+          const lineId = l.id as number;
+          return { ...l, invoiced_on: map.get(lineId) ?? [] };
+        });
+      }
+
+      res.json({ ...doc, lines });
     } catch (e) {
       console.error('quoteOrderController.getOrderById', e);
       res.status(500).json({ error: 'Failed to fetch document' });
