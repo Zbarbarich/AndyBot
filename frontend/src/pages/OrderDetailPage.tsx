@@ -5,6 +5,7 @@ import { ErrorBanner } from '../components/ErrorBanner';
 import { TicketSelector } from '../components/TicketSelector';
 import { authFetch } from '../api/client';
 import { apiBase } from '../api/config';
+import { formatDate } from '../utils/formatDate';
 
 const ORDERS_API = `${apiBase}/api/app/orders`;
 const QUOTES_API = `${apiBase}/api/app/quotes`;
@@ -29,6 +30,12 @@ interface Item {
 type BillingStatus = 'pending' | 'billable' | 'invoiced';
 const UNIT_OPTIONS = ['EA', 'DZ', 'ST', 'HR'] as const;
 
+interface InvoicedOnRow {
+  sub_order_number: string;
+  invoice_number: string;
+  quantity: number;
+}
+
 interface LineRow {
   id?: number;
   item_id: number | null;
@@ -40,6 +47,8 @@ interface LineRow {
   unit_of_measure?: string;
   sort_order: number;
   billing_status: BillingStatus;
+  quantity_billed?: number;
+  invoiced_on?: InvoicedOnRow[];
   include_in_po?: boolean;
   po_unit_cost?: number;
 }
@@ -71,6 +80,8 @@ interface OrderDetail {
     item_unit_of_measure?: string | null;
     sort_order: number;
     billing_status: string;
+    quantity_billed?: number;
+    invoiced_on?: InvoicedOnRow[];
     item_sku?: string;
     item_name?: string;
   }>;
@@ -98,6 +109,27 @@ const OrderDetailPage = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [creatingInvoice, setCreatingInvoice] = useState(false);
+  const [creatingPO, setCreatingPO] = useState(false);
+  const [poModalOpen, setPoModalOpen] = useState(false);
+  /** Line ids selected for Create PO (when modal is open). */
+  const [poSelectedLineIds, setPoSelectedLineIds] = useState<Set<number>>(new Set());
+  const [deposits, setDeposits] = useState<Array<{ id: number; amount: number; payment_method: string | null; paid_at: string; reference: string | null; applied_to_invoice_id: number | null; applied_to_invoice_number?: string | null }>>([]);
+  const [depositModalOpen, setDepositModalOpen] = useState(false);
+  const [depositForm, setDepositForm] = useState({ amount: '', payment_method: 'check' as 'cash' | 'check', paid_at: new Date().toISOString().slice(0, 10), reference: '' });
+  const [submittingDeposit, setSubmittingDeposit] = useState(false);
+  const [depositError, setDepositError] = useState('');
+  const [orderInvoices, setOrderInvoices] = useState<Array<{ id: number; invoice_number: string; sub_order_number: string }>>([]);
+  const [selectedSubOrderView, setSelectedSubOrderView] = useState<'current' | number>('current');
+  const [subOrderInvoice, setSubOrderInvoice] = useState<{
+    invoice_number: string;
+    sub_order_number: string;
+    lines: Array<{ description: string | null; quantity: number; unit_price: number; unit_of_measure?: string | null }>;
+    subtotal: number;
+    tax_rate: number;
+    tax_amount: number;
+    shipping_amount: number;
+    total: number;
+  } | null>(null);
   const [error, setError] = useState('');
   const [form, setForm] = useState({
     docType: 'order' as 'quote' | 'order' | 'return',
@@ -191,7 +223,7 @@ const OrderDetailPage = () => {
       });
       setLines(
         data.lines && data.lines.length > 0
-          ? data.lines.map((l: LineRow & { item_sku?: string; item_name?: string; unit_of_measure?: string | null; item_unit_of_measure?: string | null }, i: number) => ({
+          ? data.lines.map((l: LineRow & { item_sku?: string; item_name?: string; unit_of_measure?: string | null; item_unit_of_measure?: string | null; quantity_billed?: number; invoiced_on?: InvoicedOnRow[] }, i: number) => ({
               id: l.id,
               item_id: l.item_id ?? null,
               item_sku: l.item_sku,
@@ -202,11 +234,15 @@ const OrderDetailPage = () => {
               unit_of_measure: l.unit_of_measure ?? l.item_unit_of_measure ?? 'EA',
               sort_order: l.sort_order ?? i,
               billing_status: (l.billing_status || 'pending') as BillingStatus,
+              quantity_billed: l.quantity_billed != null ? Number(l.quantity_billed) : undefined,
+              invoiced_on: l.invoiced_on ?? undefined,
               include_in_po: false,
               po_unit_cost: undefined,
             }))
           : [emptyLine()]
       );
+      setSelectedSubOrderView('current');
+      setSubOrderInvoice(null);
       setLoading(false);
     };
     load();
@@ -214,6 +250,62 @@ const OrderDetailPage = () => {
       cancelled = true;
     };
   }, [id, isNew, fetchOrder, fetchCustomers, fetchItems]);
+
+  const fetchDeposits = useCallback(async (orderId: number) => {
+    const res = await authFetch(`${ORDERS_API}/${orderId}/deposits`);
+    if (!res.ok) return;
+    const data = await res.json();
+    setDeposits(data);
+  }, []);
+
+  useEffect(() => {
+    if (!order?.id || order.type !== 'order') return;
+    fetchDeposits(order.id);
+  }, [order?.id, order?.type, fetchDeposits]);
+
+  const fetchOrderInvoices = useCallback(async (orderId: number) => {
+    const res = await authFetch(`${ORDERS_API}/${orderId}/invoices`);
+    if (!res.ok) return;
+    const data = await res.json();
+    setOrderInvoices(data);
+  }, []);
+
+  useEffect(() => {
+    if (!order?.id || order.type !== 'order') return;
+    fetchOrderInvoices(order.id);
+  }, [order?.id, order?.type, fetchOrderInvoices]);
+
+  useEffect(() => {
+    if (selectedSubOrderView === 'current' || typeof selectedSubOrderView !== 'number') {
+      setSubOrderInvoice(null);
+      return;
+    }
+    authFetch(`${apiBase}/api/app/invoices/${selectedSubOrderView}`)
+      .then((res) => res.ok ? res.json() : null)
+      .then((inv: {
+        invoice_number: string;
+        lines: Array<{ description: string | null; quantity: number; unit_price: number; unit_of_measure?: string | null }>;
+        subtotal?: number;
+        tax_rate?: number;
+        tax_amount?: number;
+        shipping_amount?: number;
+        total?: number;
+      } | null) => {
+        if (!inv) return;
+        const sub = orderInvoices.find((i) => i.id === selectedSubOrderView);
+        setSubOrderInvoice({
+          invoice_number: inv.invoice_number,
+          sub_order_number: sub?.sub_order_number ?? '',
+          lines: inv.lines ?? [],
+          subtotal: Number(inv.subtotal ?? 0),
+          tax_rate: Number(inv.tax_rate ?? 0),
+          tax_amount: Number(inv.tax_amount ?? 0),
+          shipping_amount: Number(inv.shipping_amount ?? 0),
+          total: Number(inv.total ?? 0),
+        });
+      })
+      .catch(() => setSubOrderInvoice(null));
+  }, [selectedSubOrderView, orderInvoices]);
 
   const recalcTotals = useCallback(() => {
     const subtotal = lines.reduce((sum, l) => sum + l.quantity * l.unit_price, 0);
@@ -353,9 +445,42 @@ const OrderDetailPage = () => {
     });
   };
 
-  const totals = recalcTotals();
-  const billableCount = lines.filter((l) => l.billing_status === 'billable').length;
+  const hasRemaining = (l: LineRow) => {
+    const q = Number(l.quantity);
+    const b = Number(l.quantity_billed ?? 0);
+    return q - b > 0;
+  };
+  const displayedIndices = !isNew && order?.type === 'order' && selectedSubOrderView === 'current'
+    ? lines.map((l, i) => ({ l, i })).filter(({ l }) => hasRemaining(l)).map(({ i }) => i)
+    : lines.map((_, i) => i);
+  const displayedLines = displayedIndices.map((i) => lines[i]);
+  const isCurrentOrderRemainingView = !isNew && order?.type === 'order' && selectedSubOrderView === 'current';
+  const totals = isCurrentOrderRemainingView
+    ? (() => {
+        const subtotal = lines.reduce((sum, l) => {
+          const q = Number(l.quantity);
+          const b = Number(l.quantity_billed ?? 0);
+          const remaining = Math.max(0, q - b);
+          return sum + remaining * Number(l.unit_price);
+        }, 0);
+        const taxRate = parseFloat(form.tax_rate) || 0;
+        const shipping = parseFloat(form.shipping_amount) || 0;
+        const taxAmount = subtotal * taxRate;
+        return { subtotal, tax_amount: taxAmount, total: subtotal + taxAmount + shipping };
+      })()
+    : recalcTotals();
+  const billableCount = displayedLines.filter((l) => l.billing_status === 'billable').length;
   const hasBillableLines = billableCount > 0;
+
+  /** When viewing a sub order, show that invoice's totals; otherwise show order/remaining totals. */
+  const displayTotals = subOrderInvoice
+    ? {
+        subtotal: subOrderInvoice.subtotal,
+        tax_amount: subOrderInvoice.tax_amount,
+        shipping_amount: subOrderInvoice.shipping_amount,
+        total: subOrderInvoice.total,
+      }
+    : { ...totals, shipping_amount: parseFloat(form.shipping_amount || '0') };
 
   if (loading) {
     return (
@@ -400,8 +525,31 @@ const OrderDetailPage = () => {
 
   return (
     <div className="page-container">
-      <div className="mb-4">
+      <div className="mb-4 flex flex-wrap items-center gap-4">
         <BackArrow to="/orders" label="Back to Orders" />
+        {!isNew && order?.type === 'order' && (
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-dark-text font-medium">Order {order.document_number}</span>
+            <label className="flex items-center gap-2 text-sm">
+              <span className="text-dark-text-muted">View:</span>
+              <select
+                value={selectedSubOrderView === 'current' ? 'current' : selectedSubOrderView}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setSelectedSubOrderView(v === 'current' ? 'current' : parseInt(v, 10));
+                }}
+                className="input-field py-1.5 px-2 text-sm min-h-0 min-w-[200px]"
+              >
+                <option value="current">Current order (remaining to bill)</option>
+                {orderInvoices.map((inv) => (
+                  <option key={inv.id} value={inv.id}>
+                    {inv.sub_order_number} — Invoice #{inv.invoice_number}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        )}
       </div>
 
       {showSaveConfirm && (
@@ -501,8 +649,8 @@ const OrderDetailPage = () => {
               <textarea
                 value={form.notes}
                 onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-                className="input-field min-h-[80px]"
-                rows={2}
+                className="input-field min-h-[8rem]"
+                rows={6}
                 disabled={readOnly}
               />
             </div>
@@ -511,6 +659,37 @@ const OrderDetailPage = () => {
         {/* Line items: full width (larger component on top) */}
         <div className="p-4 sm:p-6 rounded-xl bg-dark-surface border border-dark-border">
             <h2 className="text-lg font-semibold text-dark-text mb-4">Line items</h2>
+            {!isNew && order?.type === 'order' && typeof selectedSubOrderView === 'number' && subOrderInvoice && (
+              <>
+                <p className="text-sm text-dark-text-muted mb-3">
+                  Invoiced from order {order.document_number} (sub order {subOrderInvoice.sub_order_number}) — Invoice #{subOrderInvoice.invoice_number}
+                </p>
+                <div className="table-scroll">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr>
+                        <th className="text-left py-1.5 px-2 font-medium text-dark-text-muted">Description</th>
+                        <th className="text-right py-1.5 px-2 font-medium text-dark-text-muted w-16">Qty</th>
+                        <th className="text-right py-1.5 px-2 font-medium text-dark-text-muted w-24">Unit price</th>
+                        <th className="text-right py-1.5 px-2 font-medium text-dark-text-muted w-24">Extended</th>
+                      </tr>
+                    </thead>
+                    <tbody className="text-dark-text">
+                      {subOrderInvoice.lines.map((l, i) => (
+                        <tr key={i} className="border-t border-dark-border">
+                          <td className="py-1.5 px-2">{l.description ?? '—'}</td>
+                          <td className="py-1.5 px-2 text-right font-mono">{Number(l.quantity)}</td>
+                          <td className="py-1.5 px-2 text-right font-mono">{Number(l.unit_price).toFixed(2)}</td>
+                          <td className="py-1.5 px-2 text-right font-mono">{(Number(l.quantity) * Number(l.unit_price)).toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+            {(!order || order.type !== 'order' || selectedSubOrderView === 'current' || typeof selectedSubOrderView !== 'number' || !subOrderInvoice) && (
+            <>
             {isNew && form.docType === 'order' && (
               <label className="flex items-center gap-2 mb-4 text-dark-text">
                 <input
@@ -537,7 +716,15 @@ const OrderDetailPage = () => {
                   </tr>
                 </thead>
                 <tbody className="text-dark-text">
-                  {lines.map((line, idx) => (
+                  {displayedLines.map((line, displayedIdx) => {
+                    const idx = displayedIndices[displayedIdx];
+                    const remainingQty = isCurrentOrderRemainingView
+                      ? Math.max(0, Number(line.quantity) - Number(line.quantity_billed ?? 0))
+                      : Number(line.quantity);
+                    const extendedCost = isCurrentOrderRemainingView
+                      ? remainingQty * Number(line.unit_price)
+                      : line.quantity * line.unit_price;
+                    return (
                     <tr key={idx} className="border-t border-dark-border">
                       <td className="py-1.5 px-2 font-mono whitespace-nowrap align-top">
                         <select
@@ -565,17 +752,24 @@ const OrderDetailPage = () => {
                           placeholder="Description"
                           disabled={readOnly}
                         />
+                        {line.invoiced_on?.length ? (
+                          <div className="text-xs text-dark-text-muted mt-0.5">Invoiced on {line.invoiced_on.map((x) => x.sub_order_number).join(', ')}</div>
+                        ) : null}
                       </td>
                       <td className="py-1.5 px-2 text-right align-top">
-                        <input
-                          type="number"
-                          min="0.0001"
-                          step="any"
-                          value={line.quantity}
-                          onChange={(e) => updateLine(idx, 'quantity', parseFloat(e.target.value) || 0)}
-                          className="input-field py-1.5 px-2 text-sm min-h-0 w-16 text-right"
-                          disabled={readOnly}
-                        />
+                        {isCurrentOrderRemainingView ? (
+                          <span className="font-mono">{remainingQty}</span>
+                        ) : (
+                          <input
+                            type="number"
+                            min="0.0001"
+                            step="any"
+                            value={line.quantity}
+                            onChange={(e) => updateLine(idx, 'quantity', parseFloat(e.target.value) || 0)}
+                            className="input-field py-1.5 px-2 text-sm min-h-0 w-16 text-right"
+                            disabled={readOnly}
+                          />
+                        )}
                       </td>
                       <td className="py-1.5 px-2 align-top">
                         <select
@@ -600,7 +794,7 @@ const OrderDetailPage = () => {
                           disabled={readOnly}
                         />
                       </td>
-                      <td className="py-1.5 px-2 text-right font-mono whitespace-nowrap align-top">{(line.quantity * line.unit_price).toFixed(2)}</td>
+                      <td className="py-1.5 px-2 text-right font-mono whitespace-nowrap align-top">{extendedCost.toFixed(2)}</td>
                       {isNew && createPurchaseOrder && (
                         <td className="py-1.5 px-2 align-top">
                           <input
@@ -635,7 +829,8 @@ const OrderDetailPage = () => {
                         )}
                       </td>
                     </tr>
-                  ))}
+                  );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -643,6 +838,8 @@ const OrderDetailPage = () => {
               <button type="button" onClick={addLine} className="btn-secondary mt-2">
                 Add line
               </button>
+            )}
+            </>
             )}
           </div>
 
@@ -660,12 +857,40 @@ const OrderDetailPage = () => {
                   </div>
                   <div>
                     <dt className="text-dark-text-muted text-xs">Total</dt>
-                    <dd className="font-semibold">{Number(order.total).toFixed(2)}</dd>
+                    <dd className="font-semibold">{displayTotals.total.toFixed(2)}</dd>
                   </div>
                 </dl>
                 <p className="text-xs text-dark-text-muted border-t border-dark-border pt-2 mt-2">
                   Orders close when all items are invoiced. To cancel, set line prices to 0 and create a zero-balance invoice.
                 </p>
+                {order.type === 'order' && (
+                  <div className="border-t border-dark-border pt-3 mt-3">
+                    <h3 className="text-sm font-medium text-dark-text mb-2">Deposits</h3>
+                    <p className="text-xs text-dark-text-muted mb-2">Deposit payments are recorded here and applied to the next invoice when you create it.</p>
+                    {deposits.length === 0 ? (
+                      <p className="text-xs text-dark-text-muted mb-2">No deposits yet.</p>
+                    ) : (
+                      <ul className="space-y-1.5 mb-2">
+                        {deposits.map((d) => (
+                          <li key={d.id} className="text-sm flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                            <span className="font-mono">{Number(d.amount).toFixed(2)}</span>
+                            <span className="text-dark-text-muted">{d.payment_method ?? 'deposit'}</span>
+                            <span className="text-dark-text-muted">{formatDate(d.paid_at)}</span>
+                            {d.reference && <span className="text-dark-text-muted">({d.reference})</span>}
+                            <span className="text-dark-text-muted text-xs">
+                              {d.applied_to_invoice_id != null
+                                ? (d.applied_to_invoice_number ? `Applied to invoice #${d.applied_to_invoice_number}` : 'Applied to invoice')
+                                : 'Will apply to next invoice'}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    <button type="button" onClick={() => { setDepositModalOpen(true); setDepositError(''); setDepositForm({ amount: '', payment_method: 'check', paid_at: new Date().toISOString().slice(0, 10), reference: '' }); }} className="link-primary text-sm">
+                      Add deposit
+                    </button>
+                  </div>
+                )}
                 <div className="flex flex-wrap gap-x-4 gap-y-1 pt-1">
                   {readOnly ? (
                     <button type="button" onClick={() => setIsReadOnly(false)} className="link-primary">Edit</button>
@@ -717,7 +942,7 @@ const OrderDetailPage = () => {
                       Convert to order
                     </button>
                   )}
-                  {hasBillableLines && (
+                  {hasBillableLines && selectedSubOrderView === 'current' && (
                     <button
                       type="button"
                       disabled={creatingInvoice}
@@ -744,6 +969,23 @@ const OrderDetailPage = () => {
                       {creatingInvoice ? 'Creating…' : 'Create invoice'}
                     </button>
                   )}
+                  {order.lines?.length > 0 && selectedSubOrderView === 'current' && (
+                    <button
+                      type="button"
+                      disabled={creatingPO}
+                      onClick={() => {
+                        setError('');
+                        const ids = (order.lines ?? [])
+                          .filter((l): l is typeof l & { id: number } => typeof l.id === 'number')
+                          .map((l) => l.id);
+                        setPoSelectedLineIds(new Set(ids));
+                        setPoModalOpen(true);
+                      }}
+                      className="link-primary"
+                    >
+                      Create PO
+                    </button>
+                  )}
                 </div>
               </>
             )}
@@ -755,6 +997,7 @@ const OrderDetailPage = () => {
           {/* Totals */}
           <div className="p-4 sm:p-6 rounded-xl bg-dark-surface border border-dark-border">
             <h2 className="text-lg font-semibold text-dark-text mb-3">Totals</h2>
+            {!subOrderInvoice && (
             <div className="flex flex-col gap-2 mb-3">
               <div className="flex justify-between items-center py-0.5">
                 <label className="text-sm text-dark-text-muted">Tax rate</label>
@@ -781,11 +1024,12 @@ const OrderDetailPage = () => {
                 />
               </div>
             </div>
+            )}
             <div className="border-t border-dark-border pt-2 space-y-0.5 text-sm text-dark-text">
-              <div className="flex justify-between py-0.5">Subtotal <span className="font-mono">{totals.subtotal.toFixed(2)}</span></div>
-              <div className="flex justify-between py-0.5">Tax <span className="font-mono">{totals.tax_amount.toFixed(2)}</span></div>
-              <div className="flex justify-between py-0.5">Shipping <span className="font-mono">{parseFloat(form.shipping_amount || '0').toFixed(2)}</span></div>
-              <div className="flex justify-between py-0.5 font-semibold pt-1">Total <span className="font-mono">{totals.total.toFixed(2)}</span></div>
+              <div className="flex justify-between py-0.5">Subtotal <span className="font-mono">{displayTotals.subtotal.toFixed(2)}</span></div>
+              <div className="flex justify-between py-0.5">Tax <span className="font-mono">{displayTotals.tax_amount.toFixed(2)}</span></div>
+              <div className="flex justify-between py-0.5">Shipping <span className="font-mono">{displayTotals.shipping_amount.toFixed(2)}</span></div>
+              <div className="flex justify-between py-0.5 font-semibold pt-1">Total <span className="font-mono">{displayTotals.total.toFixed(2)}</span></div>
             </div>
           </div>
         </div>
@@ -801,6 +1045,175 @@ const OrderDetailPage = () => {
             </button>
           </div>
       </form>
+
+      {/* Create PO: select lines modal */}
+      {poModalOpen && order && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60" onClick={() => setPoModalOpen(false)}>
+          <div className="bg-dark-surface border border-dark-border rounded-xl shadow-xl max-w-lg w-full max-h-[85vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="p-4 border-b border-dark-border">
+              <h3 className="text-lg font-semibold text-dark-text">Add to purchase order</h3>
+              <p className="text-sm text-dark-text-muted mt-1">Select the lines you want to include on the PO.</p>
+            </div>
+            <div className="p-4 overflow-y-auto flex-1">
+              <ul className="space-y-2">
+                {(order.lines ?? []).map((line) => {
+                  const lineId = line.id;
+                  if (typeof lineId !== 'number') return null;
+                  const label = line.item_sku && line.item_name ? `${line.item_sku} – ${line.item_name}` : (line.description || '—');
+                  return (
+                    <li key={lineId} className="flex items-center gap-3 py-2 border-b border-dark-border last:border-0">
+                      <input
+                        type="checkbox"
+                        id={`po-line-${lineId}`}
+                        checked={poSelectedLineIds.has(lineId)}
+                        onChange={(e) => {
+                          setPoSelectedLineIds((prev) => {
+                            const next = new Set(prev);
+                            if (e.target.checked) next.add(lineId);
+                            else next.delete(lineId);
+                            return next;
+                          });
+                        }}
+                        className="rounded border-dark-border"
+                      />
+                      <label htmlFor={`po-line-${lineId}`} className="flex-1 cursor-pointer text-dark-text text-sm">
+                        {label} — {Number(line.quantity)} × {Number(line.unit_price).toFixed(2)}
+                      </label>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+            <div className="p-4 border-t border-dark-border flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={creatingPO || poSelectedLineIds.size === 0}
+                className="btn-primary"
+                onClick={async () => {
+                  setError('');
+                  setCreatingPO(true);
+                  try {
+                    const res = await authFetch(`${ORDERS_API}/${order.id}/purchase-orders`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ line_ids: Array.from(poSelectedLineIds) }),
+                    });
+                    const data = await res.json().catch(() => ({}));
+                    if (!res.ok) throw new Error(data.error || 'Failed to create purchase order');
+                    setPoModalOpen(false);
+                    navigate(`/purchasing/${data.id}`);
+                  } catch (e) {
+                    setError(e instanceof Error ? e.message : 'Failed to create purchase order');
+                  } finally {
+                    setCreatingPO(false);
+                  }
+                }}
+              >
+                {creatingPO ? 'Creating…' : 'Create PO'}
+              </button>
+              <button type="button" onClick={() => setPoModalOpen(false)} className="btn-secondary">
+                Cancel
+              </button>
+            </div>
+            {error && (
+              <div className="px-4 pb-4">
+                <p className="text-red-400 text-sm">{error}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Add deposit modal */}
+      {depositModalOpen && order && order.type === 'order' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60" onClick={() => setDepositModalOpen(false)}>
+          <div className="bg-dark-surface border border-dark-border rounded-xl shadow-xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold text-dark-text mb-2">Add deposit</h3>
+            <p className="text-sm text-dark-text-muted mb-4">This payment will be applied to the next invoice created for this order.</p>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-dark-text-muted mb-1">Amount</label>
+                <input
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  value={depositForm.amount}
+                  onChange={(e) => setDepositForm((f) => ({ ...f, amount: e.target.value }))}
+                  className="input-field w-full"
+                  placeholder="0.00"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-dark-text-muted mb-1">Payment type</label>
+                <select
+                  value={depositForm.payment_method}
+                  onChange={(e) => setDepositForm((f) => ({ ...f, payment_method: e.target.value as 'cash' | 'check' }))}
+                  className="input-field w-full"
+                >
+                  <option value="check">Check</option>
+                  <option value="cash">Cash</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-dark-text-muted mb-1">Date</label>
+                <input
+                  type="date"
+                  value={depositForm.paid_at}
+                  onChange={(e) => setDepositForm((f) => ({ ...f, paid_at: e.target.value }))}
+                  className="input-field w-full"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-dark-text-muted mb-1">Reference (optional)</label>
+                <input
+                  type="text"
+                  value={depositForm.reference}
+                  onChange={(e) => setDepositForm((f) => ({ ...f, reference: e.target.value }))}
+                  className="input-field w-full"
+                  placeholder="Check #, etc."
+                />
+              </div>
+            </div>
+            {depositError && <p className="text-red-400 text-sm mt-2">{depositError}</p>}
+            <div className="flex flex-wrap gap-2 mt-6">
+              <button
+                type="button"
+                disabled={submittingDeposit || !depositForm.amount || parseFloat(depositForm.amount) <= 0}
+                className="btn-primary"
+                onClick={async () => {
+                  setDepositError('');
+                  setSubmittingDeposit(true);
+                  try {
+                    const res = await authFetch(`${ORDERS_API}/${order.id}/deposits`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        amount: parseFloat(depositForm.amount),
+                        payment_method: depositForm.payment_method,
+                        paid_at: depositForm.paid_at || new Date().toISOString().slice(0, 10),
+                        reference: depositForm.reference.trim() || undefined,
+                      }),
+                    });
+                    const data = await res.json().catch(() => ({}));
+                    if (!res.ok) throw new Error(data.error || 'Failed to add deposit');
+                    setDepositModalOpen(false);
+                    fetchDeposits(order.id);
+                  } catch (e) {
+                    setDepositError(e instanceof Error ? e.message : 'Failed to add deposit');
+                  } finally {
+                    setSubmittingDeposit(false);
+                  }
+                }}
+              >
+                {submittingDeposit ? 'Adding…' : 'Add deposit'}
+              </button>
+              <button type="button" onClick={() => setDepositModalOpen(false)} className="btn-secondary">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

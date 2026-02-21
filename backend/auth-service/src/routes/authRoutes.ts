@@ -1,6 +1,6 @@
 import express, { Router } from "express";
 import authController from "../controllers/authController";
-import { verifyUserContext, isAdmin } from "../middleware/authMiddleware";
+import { verifyUserContext, optionalVerifyUserContext, isAdmin } from "../middleware/authMiddleware";
 
 const router: Router = express.Router();
 
@@ -16,8 +16,8 @@ router.post("/validate", verifyUserContext, authController.validateUser);
 
 // Protected user management routes
 router.get("/users", verifyUserContext, isAdmin, authController.getAllUsers);
-// Allow first user creation without auth, subsequent users require admin
-router.post("/users", authController.createUser);
+// Allow first user creation without auth; subsequent users require admin (optionalVerify sets req.user when token present)
+router.post("/users", optionalVerifyUserContext, authController.createUser);
 router.put("/users/:id", verifyUserContext, isAdmin, authController.updateUser);
 router.delete("/users/:id", verifyUserContext, authController.deleteUser);
 

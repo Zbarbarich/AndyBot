@@ -4,6 +4,7 @@ import './styles/index.css';
 import LandingPage from './pages/LandingPage';
 import CustomersPage from './pages/CustomersPage';
 import CustomerDetailPage from './pages/CustomerDetailPage';
+import CustomerPaymentHistoryPage from './pages/CustomerPaymentHistoryPage';
 import CustomerFormPage from './pages/CustomerFormPage';
 import TicketsPage from './pages/TicketsPage';
 import TicketDetailPage from './pages/TicketDetailPage';
@@ -50,6 +51,7 @@ function App() {
             <Route path="/" element={<LandingPage />} />
             <Route path="/customers" element={<CustomersPage />} />
             <Route path="/customers/new" element={<CustomerFormPage />} />
+            <Route path="/customers/:id/payment-history" element={<CustomerPaymentHistoryPage />} />
             <Route path="/customers/:id" element={<CustomerDetailPage />} />
             <Route path="/tickets" element={<TicketsPage />} />
             <Route path="/tickets/new" element={<TicketFormPage />} />

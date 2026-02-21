@@ -135,7 +135,7 @@ const AppLayout = () => {
             </span>
           </div>
           <div className="shrink-0 w-full max-w-2xl">
-            <GlobalSearch getToken={() => localStorage.getItem('token')} placeholder="Search customers, tickets, orders, invoices…" className="w-full" />
+            <GlobalSearch getToken={() => localStorage.getItem('token')} placeholder="Search customers, tickets, orders, invoices, POs, items…" className="w-full" />
           </div>
           <div className="flex-1 min-w-0 flex items-center justify-end">
             <div className="relative" ref={profileRef}>
@@ -197,7 +197,7 @@ const AppLayout = () => {
                 onClick={() => setMenuOpen(false)}
                 aria-hidden="true"
               />
-              <div className="fixed top-[7rem] right-0 bottom-0 w-full max-w-[280px] bg-dark-surface border-l border-dark-border z-50 shadow-xl lg:hidden overflow-y-auto">
+              <div className="fixed top-0 right-0 bottom-0 w-full max-w-[280px] bg-dark-surface border-l border-dark-border z-50 shadow-xl lg:hidden overflow-y-auto">
                 <div className="py-4 px-2">
                   {user && (
                     <div className="px-4 py-2 mb-2 text-sm text-dark-text-muted border-b border-dark-border">

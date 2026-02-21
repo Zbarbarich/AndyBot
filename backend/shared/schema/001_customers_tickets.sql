@@ -11,7 +11,8 @@ CREATE TABLE IF NOT EXISTS customers (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Tickets: customer_id nullable for N/A; status: Open | Pending Closure Review | Closed
+-- Tickets: customer_id nullable for N/A; status: Open | Pending Closure Review | Closed.
+-- creation_date = business date (display/sort); created_at = audit; both DEFAULT NOW(), do not set from app.
 CREATE TABLE IF NOT EXISTS tickets (
   id SERIAL PRIMARY KEY,
   creation_date TIMESTAMPTZ NOT NULL DEFAULT NOW(),

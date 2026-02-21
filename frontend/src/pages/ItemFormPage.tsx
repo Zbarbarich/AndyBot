@@ -68,12 +68,13 @@ const ItemFormPage = () => {
           <h2 className="text-lg font-semibold text-dark-text mb-4">New Item</h2>
           <div className="detail-grid gap-4">
             <div>
-              <label className="block text-sm font-medium text-dark-text-muted mb-1">SKU *</label>
+              <label className="block text-sm font-medium text-dark-text-muted mb-1">SKU * (max 16 chars, letters, numbers, - and _)</label>
               <input
                 type="text"
                 value={form.sku}
                 onChange={(e) => setForm((f) => ({ ...f, sku: e.target.value }))}
                 className="input-field max-w-[140px]"
+                maxLength={16}
                 required
               />
             </div>

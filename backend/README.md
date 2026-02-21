@@ -1,8 +1,10 @@
 # Backend – API Gateway + Microservices
 
-The API gateway is the single entry point for the frontend. It proxies `/api/auth` to auth-service and `/api/app/*` to customer-, ticket-, order-, invoice-, or pdf-service by path. `/api/app/purchase-orders` and purchase order PDFs are proxied to order-service and pdf-service. It also exposes `GET /api/app/search?q=<term>` (JWT required), which calls each app service's search endpoint in parallel and returns aggregated JSON `{ customers, tickets, orders, invoices, items }`.
+The API gateway is the single entry point for the frontend. It proxies `/api/auth` to auth-service and `/api/app/*` to customer-, ticket-, order-, invoice-, or pdf-service by path. `/api/app/purchase-orders` and purchase order PDFs are proxied to order-service and pdf-service. It also exposes `GET /api/app/search?q=<term>` (JWT required), which calls each app service's search endpoint in parallel and returns aggregated JSON `{ customers, tickets, orders, invoices, items, purchase_orders }`.
 
-Schema and migrations 001–013 are in `shared/`; see [shared/README.md](shared/README.md) for run order and migration scripts.
+Customer payment history: `GET /api/app/customers/:id/payment-history`. Reverse invoice payment: `DELETE /api/app/invoices/:id/payments/:paymentId`. Remove unapplied deposit: `DELETE /api/app/orders/:orderId/deposits/:depositId`.
+
+Schema and migrations 000–019 are in `shared/schema/`; see [shared/README.md](shared/README.md) for run order and [shared/schema/README.md](shared/schema/README.md) for table reference, timezone, and timestamp discipline.
 
 ## Running locally
 

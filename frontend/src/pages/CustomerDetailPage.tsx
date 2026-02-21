@@ -11,6 +11,7 @@ const TICKETS_API = `${apiBase}/api/app/tickets`;
 interface Customer {
   id: number;
   name: string;
+  contact_name?: string | null;
   physical_address: string | null;
   email: string | null;
   phone: string | null;
@@ -68,7 +69,7 @@ const CustomerDetailPage = () => {
   const [ordersTab, setOrdersTab] = useState<Tab>('open');
   const [invoicesTab, setInvoicesTab] = useState<Tab>('open');
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editForm, setEditForm] = useState({ name: '', physical_address: '', email: '', phone: '', email_notifications: true, text_notifications: false });
+  const [editForm, setEditForm] = useState({ name: '', contact_name: '', physical_address: '', email: '', phone: '', email_notifications: true, text_notifications: false });
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -134,6 +135,7 @@ const CustomerDetailPage = () => {
     if (!customer) return;
     setEditForm({
       name: customer.name,
+      contact_name: customer.contact_name || '',
       physical_address: customer.physical_address || '',
       email: customer.email || '',
       phone: customer.phone || '',
@@ -154,6 +156,7 @@ const CustomerDetailPage = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: editForm.name.trim(),
+          contact_name: editForm.contact_name.trim() || null,
           physical_address: editForm.physical_address || null,
           email: editForm.email || null,
           phone: editForm.phone || null,
@@ -222,6 +225,12 @@ const CustomerDetailPage = () => {
                 <dt className="text-dark-text-muted text-xs">Name</dt>
                 <dd className="font-medium">{customer.name}</dd>
               </div>
+              {customer.contact_name && (
+                <div>
+                  <dt className="text-dark-text-muted text-xs">Contact (POC)</dt>
+                  <dd>{customer.contact_name}</dd>
+                </div>
+              )}
               {customer.physical_address && (
                 <div>
                   <dt className="text-dark-text-muted text-xs">Address</dt>
@@ -250,6 +259,7 @@ const CustomerDetailPage = () => {
               </div>
             </dl>
             <div className="mt-4 pt-4 border-t border-dark-border flex flex-wrap gap-2">
+              <button type="button" onClick={() => navigate(`/customers/${customer.id}/payment-history`)} className="btn-secondary text-sm py-1.5 px-3 min-h-[36px]">Payment history</button>
               <button type="button" onClick={openEditModal} className="btn-secondary text-sm py-1.5 px-3 min-h-[36px]">Edit</button>
               <button type="button" onClick={handleDelete} className="btn-secondary text-sm text-red-400 py-1.5 px-3 min-h-[36px]">Delete</button>
             </div>
@@ -302,7 +312,7 @@ const CustomerDetailPage = () => {
                       onClick={() => navigate(`/tickets/${t.id}`)}
                     >
                       <td className="col-id font-mono">{t.id}</td>
-                      <td className="col-date whitespace-nowrap">{new Date(t.creation_date).toLocaleDateString()}</td>
+                      <td className="col-date whitespace-nowrap">{formatDate(t.creation_date)}</td>
                       <td className="font-medium">{t.subject}</td>
                       <td className="col-status">{t.category ?? '—'}</td>
                       <td className="col-id">{t.priority}</td>
@@ -429,6 +439,16 @@ const CustomerDetailPage = () => {
                   onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
                   className="input-field"
                   required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-dark-text-muted mb-1">Contact name (POC)</label>
+                <input
+                  type="text"
+                  value={editForm.contact_name}
+                  onChange={(e) => setEditForm((f) => ({ ...f, contact_name: e.target.value }))}
+                  className="input-field"
+                  placeholder="Point of contact"
                 />
               </div>
               <div>

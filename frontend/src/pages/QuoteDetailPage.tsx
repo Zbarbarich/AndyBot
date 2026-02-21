@@ -417,8 +417,8 @@ const QuoteDetailPage = () => {
               <textarea
                 value={form.notes}
                 onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-                className="input-field min-h-[80px]"
-                rows={2}
+                className="input-field min-h-[8rem]"
+                rows={6}
                 disabled={readOnly}
               />
             </div>

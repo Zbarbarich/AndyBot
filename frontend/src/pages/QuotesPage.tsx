@@ -67,11 +67,11 @@ const QuotesPage = () => {
 
   return (
     <div className="page-container">
-      <div className="flex justify-end mb-2">
+      <div className="flex flex-nowrap items-center justify-end gap-2 mb-2">
         <button
           type="button"
           onClick={() => navigate('/quotes/new')}
-          className="btn-icon-primary"
+          className="btn-icon-primary shrink-0"
           aria-label="New quote"
         >
           <Plus className="w-5 h-5" />

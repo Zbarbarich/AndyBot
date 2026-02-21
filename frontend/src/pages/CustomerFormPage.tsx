@@ -11,6 +11,7 @@ const CustomerFormPage = () => {
   const [error, setError] = useState('');
   const [form, setForm] = useState({
     name: '',
+    contact_name: '',
     physical_address: '',
     email: '',
     phone: '',
@@ -27,6 +28,7 @@ const CustomerFormPage = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: form.name.trim(),
+          contact_name: form.contact_name.trim() || null,
           physical_address: form.physical_address || null,
           email: form.email || null,
           phone: form.phone || null,
@@ -65,6 +67,16 @@ const CustomerFormPage = () => {
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
               className="input-field"
               required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-dark-text-muted mb-1">Contact name (POC)</label>
+            <input
+              type="text"
+              value={form.contact_name}
+              onChange={(e) => setForm((f) => ({ ...f, contact_name: e.target.value }))}
+              className="input-field"
+              placeholder="Point of contact"
             />
           </div>
           <div>

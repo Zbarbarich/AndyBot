@@ -172,8 +172,8 @@ const TicketEditPage = () => {
             <textarea
               value={form.description}
               onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-              className="input-field min-h-[100px]"
-              rows={4}
+              className="input-field min-h-[8rem]"
+              rows={6}
             />
           </div>
           <div>

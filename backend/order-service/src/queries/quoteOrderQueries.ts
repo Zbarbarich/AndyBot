@@ -81,6 +81,7 @@ const quoteOrderQueries = {
 
   getLinesByQuoteOrderId: `
     SELECT l.id, l.quote_order_id, l.order_id, l.order_document_number, l.sku, l.item_id, l.description, l.quantity, l.unit_price, l.sort_order, l.billing_status, l.unit_of_measure,
+           COALESCE(l.quantity_billed, 0)::numeric AS quantity_billed,
            i.sku AS item_sku, i.name AS item_name, i.unit_of_measure AS item_unit_of_measure
     FROM quote_order_lines l
     LEFT JOIN items i ON i.id = l.item_id

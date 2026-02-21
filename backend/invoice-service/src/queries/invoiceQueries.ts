@@ -52,17 +52,21 @@ const invoiceQueries = {
   getByOrderId: `
     SELECT i.id, i.invoice_number, i.order_id, i.customer_id, i.invoice_date, i.due_date,
            i.subtotal, i.tax_amount, i.shipping_amount, i.total,
-           c.name AS customer_name
+           c.name AS customer_name,
+           q.document_number AS order_document_number
     FROM invoices i
     JOIN customers c ON c.id = i.customer_id
+    JOIN quotes_orders q ON q.id = i.order_id
     WHERE i.order_id = $1
     ORDER BY i.invoice_number ASC
   `,
 
   orderBillableLines: `
-    SELECT id, quote_order_id, item_id, description, quantity, unit_price, sort_order
+    SELECT id, quote_order_id, item_id, description, quantity, unit_price, sort_order,
+           COALESCE(quantity_billed, 0)::numeric AS quantity_billed
     FROM quote_order_lines
     WHERE quote_order_id = $1 AND billing_status = 'billable'
+      AND (quantity - COALESCE(quantity_billed, 0)) > 0
     ORDER BY sort_order ASC, id ASC
   `,
 
@@ -80,7 +84,20 @@ const invoiceQueries = {
 
   setOrderLineInvoiced: `UPDATE quote_order_lines SET billing_status = 'invoiced' WHERE id = $1`,
 
-  countOrderLinesNotInvoiced: `SELECT COUNT(*)::int AS count FROM quote_order_lines WHERE quote_order_id = $1 AND billing_status != 'invoiced'`,
+  /** Add quantity_billed and set billing_status to 'invoiced' when fully billed */
+  addOrderLineQuantityBilled: `
+    UPDATE quote_order_lines
+    SET quantity_billed = quantity_billed + $2,
+        billing_status = CASE WHEN (quantity_billed + $2) >= quantity THEN 'invoiced' ELSE billing_status END
+    WHERE id = $1
+    RETURNING id, quantity_billed, billing_status
+  `,
+
+  countOrderLinesNotInvoiced: `
+    SELECT COUNT(*)::int AS count
+    FROM quote_order_lines
+    WHERE quote_order_id = $1 AND billing_status = 'billable' AND (quantity - COALESCE(quantity_billed, 0)) > 0
+  `,
 
   setOrderClosed: `UPDATE quotes_orders SET status = 'closed', updated_at = NOW() WHERE id = $1 AND type = 'order' RETURNING id`,
 
@@ -89,6 +106,17 @@ const invoiceQueries = {
     FROM invoice_payments
     WHERE invoice_id = $1
     ORDER BY paid_at ASC
+  `,
+
+  getPaymentById: `
+    SELECT id, invoice_id, amount, payment_method, paid_at, reference
+    FROM invoice_payments
+    WHERE id = $1 AND invoice_id = $2
+  `,
+
+  deletePayment: `
+    DELETE FROM invoice_payments WHERE id = $1 AND invoice_id = $2
+    RETURNING id
   `,
 
   insertPayment: `
@@ -106,6 +134,17 @@ const invoiceQueries = {
         updated_at = NOW()
     WHERE i.id = $1
     RETURNING id, invoice_number, order_id, customer_id, ticket_id, invoice_date, due_date, subtotal, tax_rate, tax_amount, shipping_amount, total, amount_paid, payment_method, paid_at, created_at, updated_at
+  `,
+
+  getUnappliedDepositsByOrderId: `
+    SELECT id, quote_order_id, amount, payment_method, paid_at, reference
+    FROM order_deposits
+    WHERE quote_order_id = $1 AND applied_to_invoice_id IS NULL
+    ORDER BY paid_at ASC
+  `,
+
+  markDepositsApplied: `
+    UPDATE order_deposits SET applied_to_invoice_id = $2 WHERE id = ANY($1::int[])
   `,
 };
 

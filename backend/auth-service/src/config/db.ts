@@ -18,6 +18,11 @@ if (process.env.DB_SSL === "true") {
 
 const pool = new Pool(poolConfig);
 
+// All timestamps and CURRENT_DATE in this app are in Eastern (New York).
+pool.on("connect", (client) => {
+  void client.query("SET timezone = 'America/New_York'");
+});
+
 // Connection test - log clear message if DB is unreachable
 pool.connect((err, client, release) => {
   if (err) {

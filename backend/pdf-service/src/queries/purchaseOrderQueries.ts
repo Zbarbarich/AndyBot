@@ -2,7 +2,7 @@ const purchaseOrderQueries = {
   getById: `
     SELECT po.id, po.po_number, po.order_id, po.created_at, po.status,
            q.document_number AS order_document_number,
-           c.name AS customer_name
+           c.name AS customer_name, c.contact_name AS customer_contact_name, c.physical_address AS customer_address
     FROM purchase_orders po
     JOIN quotes_orders q ON q.id = po.order_id
     JOIN customers c ON c.id = q.customer_id
