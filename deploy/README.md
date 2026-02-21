@@ -6,11 +6,44 @@ Single-instance Docker Compose deployment with Caddy (HTTPS), PostgreSQL, and al
 
 1. Copy `deploy/.env.example` to `deploy/.env` and set `POSTGRES_USER`, `POSTGRES_PASSWORD`, `JWT_SECRET`, and optionally `POSTGRES_DB`, `JWT_EXPIRES_IN`, `CORS_ORIGIN` (your production URL, e.g. `https://yourdomain.com`), `COMPANY_NAME`, `COMPANY_LOGO_URL`.
 2. Replace `yourdomain.com` in `deploy/Caddyfile` with your real domain.
-3. Run database migrations once (see below) before or right after first `docker compose up`.
-4. From the **repo root**:
+3. **On a small instance (e.g. 1 GB RAM):** add swap before the first build so parallel builds don’t freeze (see [Build issues on small instances](#build-issues-on-small-instances)).
+4. Run database migrations once (see below) before or right after first `docker compose up`.
+5. From the **repo root**:
    ```bash
    docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d --build
    ```
+
+## Build issues on small instances
+
+**Symptom:** `docker compose up -d --build` freezes (often around step 30–40) or the system becomes unresponsive.
+
+**Cause:** Docker Compose builds multiple images in parallel. Each image runs `npm ci`, which is memory-heavy. On a 1 GB instance (e.g. Oracle VM.Standard.E2.1.Micro), several concurrent `npm ci` processes exhaust RAM and the build freezes or gets OOM-killed.
+
+**Fix:** Add swap so the system has enough effective memory for parallel builds. On the server, run once:
+
+```bash
+sudo bash deploy/add-swap.sh
+```
+
+Then run the full build again. To make swap persistent across reboots, add this line to `/etc/fstab` (as suggested by the script):
+
+```
+/swapfile none swap sw 0 0
+```
+
+Alternative: use a larger instance (e.g. Oracle Ampere with 6 GB RAM) so swap is optional.
+
+**Symptom:** Build fails with `ECONNRESET` or “Client network socket disconnected before secure TLS connection” during `npm ci`.
+
+**Cause:** Many parallel builds hit the npm registry at once; connections get reset (rate limiting or overload).
+
+**Fix:** Build one service at a time so only one `npm ci` talks to the registry. From repo root:
+
+```bash
+./deploy/build-sequential.sh
+```
+
+This builds auth-service, customer-service, ticket-service, order-service, invoice-service, pdf-service, api-gateway, and frontend in order, then runs `docker compose up -d`. Slower but reliable on small instances or flaky networks.
 
 ## Database migrations
 

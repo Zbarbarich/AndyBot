@@ -136,6 +136,10 @@ The frontend is a single-page application with protected routes. Login persists 
 
 **Styling:** Grid-based layout; compact table columns (e.g. col-id, col-date, col-status, col-amount) on list pages; short-field styling for IDs, dates, and amounts on detail views.
 
+## Deployment
+
+Production deploy uses Docker Compose (PostgreSQL, all backend services, frontend, Caddy for HTTPS). See [deploy/README.md](deploy/README.md) for quick start, migrations, and build notes. For Oracle Cloud and CI/CD setup, see [docs/DEPLOYMENT_ORACLE_CI_ACCESS.md](docs/DEPLOYMENT_ORACLE_CI_ACCESS.md).
+
 ## License
 
 Private project - All rights reserved
