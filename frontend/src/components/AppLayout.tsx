@@ -167,28 +167,29 @@ const AppLayout = () => {
           </div>
         </header>
 
-        {/* Mobile: nav bar with search + hamburger */}
+        {/* Mobile: single-line nav bar — title, search, hamburger */}
         <nav className="lg:hidden bg-dark-surface border-b border-dark-border sticky top-0 z-50">
-          <div className="max-w-container mx-auto px-4 sm:px-6 py-1.5 flex flex-col gap-2">
-            <div className="flex justify-between items-center gap-2 min-h-[40px]">
-              <span className="text-sm font-semibold text-dark-text truncate">{pageTitle}</span>
-              <button
-                type="button"
-                onClick={() => setMenuOpen((o) => !o)}
-                className="p-3 rounded-lg text-dark-text hover:bg-dark-surface-elevated focus:outline-none focus:ring-2 focus:ring-primary min-h-[44px] min-w-[44px] flex items-center justify-center shrink-0"
-                aria-label={menuOpen ? 'Close menu' : 'Open menu'}
-                aria-expanded={menuOpen}
-              >
-                {menuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-              </button>
-            </div>
-            <div className="w-full">
+          <div className="max-w-container mx-auto px-3 sm:px-4 py-1 flex items-center gap-2 min-h-[40px]">
+            <span className="text-sm font-semibold text-dark-text truncate shrink-0 max-w-[5rem] sm:max-w-[7rem]" aria-hidden="true">
+              {pageTitle}
+            </span>
+            <div className="flex-1 min-w-0">
               <GlobalSearch
                 getToken={() => localStorage.getItem('token')}
                 placeholder="Search…"
                 onResultClick={() => setMenuOpen(false)}
+                compact
               />
             </div>
+            <button
+              type="button"
+              onClick={() => setMenuOpen((o) => !o)}
+              className="p-2 rounded-lg text-dark-text hover:bg-dark-surface-elevated focus:outline-none focus:ring-2 focus:ring-primary min-h-[36px] min-w-[36px] flex items-center justify-center shrink-0"
+              aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+              aria-expanded={menuOpen}
+            >
+              {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
           </div>
           {menuOpen && (
             <>

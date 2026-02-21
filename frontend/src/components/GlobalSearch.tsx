@@ -22,9 +22,11 @@ interface GlobalSearchProps {
   className?: string;
   placeholder?: string;
   onResultClick?: () => void;
+  /** Compact styling for mobile nav (single-line bar) */
+  compact?: boolean;
 }
 
-export default function GlobalSearch({ getToken, className = '', placeholder = 'Search…', onResultClick }: GlobalSearchProps) {
+export default function GlobalSearch({ getToken, className = '', placeholder = 'Search…', onResultClick, compact = false }: GlobalSearchProps) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResults | null>(null);
   const [loading, setLoading] = useState(false);
@@ -113,7 +115,7 @@ export default function GlobalSearch({ getToken, className = '', placeholder = '
   return (
     <div ref={containerRef} className={`relative ${className}`}>
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-dark-text-muted pointer-events-none" />
+        <Search className={`absolute left-3 top-1/2 -translate-y-1/2 text-dark-text-muted pointer-events-none ${compact ? 'w-3.5 h-3.5' : 'w-4 h-4'}`} />
         <input
           ref={inputRef}
           type="search"
@@ -121,7 +123,7 @@ export default function GlobalSearch({ getToken, className = '', placeholder = '
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => query.trim() && setOpen(true)}
           placeholder={placeholder}
-          className="input-field w-full py-2 pl-9 pr-3 text-sm rounded-full"
+          className={`input-field w-full py-2 pl-9 pr-3 text-sm rounded-full ${compact ? 'input-field-compact' : ''}`}
           aria-label="Global search"
           aria-expanded={open}
           aria-autocomplete="list"
