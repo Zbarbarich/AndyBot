@@ -33,64 +33,122 @@ theNineteenthChamber/
 ### Prerequisites
 
 - Node.js (v18+)
-- PostgreSQL (v12+)
 - npm
 
-### Setup
+For **development mode** (see below) you use the hosted database via an SSH tunnel; no local PostgreSQL is required. For **local database** development you would need PostgreSQL (v12+) and would run migrations yourself.
 
-1. **Install dependencies:**
+## Development mode (recommended: local app + hosted DB via SSH tunnel)
+
+This is the setup for day-to-day development: run the frontend and backend on your machine while connecting to the **same PostgreSQL database** used by the hosted app. No Docker and no local Postgres needed. All local env files are gitignored; production and CI/CD are unchanged.
+
+### One-time setup
+
+1. **Install dependencies**
    ```bash
    npm run install-all
    ```
 
-2. **Configure environment variables:**
+2. **Create local env files from examples** (do not commit these; they are in `.gitignore`):
    ```bash
-   cp backend/api-gateway/.env.example backend/api-gateway/.env
    cp backend/auth-service/.env.example backend/auth-service/.env
+   cp backend/api-gateway/.env.example backend/api-gateway/.env
+   cp frontend/.env.example frontend/.env
    ```
-   Edit `backend/auth-service/.env` with your PostgreSQL credentials.
 
-   **Backend app services:** After creating `backend/auth-service/.env`, run the env copy script so customer, ticket, order, invoice, and pdf services get env and correct ports:
+3. **Edit `backend/auth-service/.env`** for the tunnel setup. The app expects **`DB_*`** variable names (not `POSTGRES_*`). Use exactly:
+   - **DB_HOST=localhost** — required when using the SSH tunnel (tunnel forwards localhost:5432 to the server).
+   - **DB_PORT=5432**
+   - **DB_NAME=the_nineteenth_chamber** — must match the hosted app’s database name (lowercase, underscores).
+   - **DB_USER** and **DB_PASSWORD** — same as on the server (e.g. from the deploy env or from `docker exec deploy-postgres-1 env | grep POSTGRES_` on the server; the role name is often the value of `POSTGRES_USER`).
+   - **DB_SSL=false** — the Postgres container on the server does not use SSL; the tunnel is already encrypted.
+
+   Example (replace with your real credentials):
+   ```env
+   DB_HOST=localhost
+   DB_PORT=5432
+   DB_NAME=the_nineteenth_chamber
+   DB_USER=your_actual_db_user
+   DB_PASSWORD=your_actual_password
+   DB_SSL=false
+   ```
+
+4. **Propagate auth-service env to all DB-using services** (customer, ticket, order, invoice, pdf) and set their ports:
    ```bash
-   chmod +x backend/scripts/setup-env.sh && backend/scripts/setup-env.sh
-   ```
-   Or from `backend/`: `./scripts/setup-env.sh`
-
-3. **Create PostgreSQL database:**
-   ```sql
-   CREATE DATABASE "TheNineteenthChamber";
+   cd backend
+   chmod +x scripts/setup-env.sh
+   ./scripts/setup-env.sh
    ```
 
-4. **Run database migrations:** Run the schema files in `backend/shared/schema/` once (001 through 013; see [backend/shared/README.md](backend/shared/README.md)). Migration 007 is optional (destructive fresh start); 008–013 are sequential.
+5. **Edit `backend/api-gateway/.env`** — ensure `CORS_ORIGIN=http://localhost:5173` so the browser can call the API when the frontend runs on port 5173.
 
-5. **Start services:**
+6. **Edit `frontend/.env`** — ensure `VITE_API_BASE=http://localhost:3000` so the dev server talks to your local API gateway.
+
+### Port 5432 on your machine
+
+If you have **local PostgreSQL** installed and it is using port 5432, either stop it while using the tunnel or the tunnel will fail with “Address already in use.” You do not need local Postgres for this development setup.
+
+### Run each time you develop
+
+1. **Open the SSH tunnel** (leave this terminal open):
    ```bash
-   npm start
+   ssh -i /path/to/your/key -L 5432:127.0.0.1:5432 ubuntu@YOUR_SERVER_IP
+   ```
+   Replace with your key path and server IP. This forwards your local port 5432 to the Postgres container on the server.
+
+2. **Start the backend** (from repo root or `backend/`):
+   ```bash
+   cd backend
+   npm run dev
+   ```
+   Or from repo root: `npm start` (starts backend only; start frontend separately).
+
+3. **Start the frontend** (in another terminal):
+   ```bash
+   cd frontend
+   npm run dev
    ```
 
-   **Services:**
-   - Frontend: http://localhost:5173
-   - API Gateway: http://localhost:3000
-   - Auth Service: http://localhost:3001
-   - Customer Service: http://localhost:3003
-   - Ticket Service: http://localhost:3004
-   - Order Service: http://localhost:3005
-   - Invoice Service: http://localhost:3006
-   - PDF Service: http://localhost:3007
+4. **Open the app:** http://localhost:5173 — you’ll be using the same data as the hosted app (same DB via tunnel).
 
-## Development
+### Summary
 
-**Start all services:**
+| Item | Development mode | Production (hosted) |
+|------|------------------|----------------------|
+| Env source | Per-service `.env` (gitignored), from `.env.example` | `deploy/.env` + Docker Compose |
+| DB connection | SSH tunnel: localhost:5432 → server Postgres | Containers → `postgres:5432` |
+| Start | Tunnel + `npm run dev` (backend + frontend) | `docker compose -f deploy/docker-compose.yml --env-file deploy/.env up` |
+
+### Preparing for commit
+
+- **Do not commit** `.env` or `deploy/.env` — they are listed in `.gitignore`. They contain secrets and local/remote DB settings.
+- **Safe to commit:** code changes, `.env.example` files, README, `setup-env.sh`, and other non-secret config. Run `git status` before committing to confirm no `.env` files are staged.
+
+## Development (other)
+
+**Backend only (from repo root):**
 ```bash
 npm start
 ```
 
-**Start backend only:**
+**Backend only (from backend/):**
 ```bash
 cd backend && npm run dev
 ```
 
-Hot reloading is enabled for both frontend (Vite HMR) and backend (Nodemon).
+Hot reloading: frontend (Vite HMR), backend (Nodemon).
+
+## Services (ports)
+
+When running locally:
+
+- Frontend: http://localhost:5173
+- API Gateway: http://localhost:3000
+- Auth Service: http://localhost:3001
+- Customer Service: http://localhost:3003
+- Ticket Service: http://localhost:3004
+- Order Service: http://localhost:3005
+- Invoice Service: http://localhost:3006
+- PDF Service: http://localhost:3007
 
 ## API Endpoints
 
