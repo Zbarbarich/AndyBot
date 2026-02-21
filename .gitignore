@@ -10,6 +10,7 @@ node_modules/
 # Environment variables
 .env
 .env''
+deploy/.env
 .env.local
 .env.development.local
 .env.test.local
@@ -34,6 +35,9 @@ lerna-debug.log*
 # OS
 .DS_Store
 Thumbs.db
+
+# Local commit message draft (do not push)
+COMMIT_MSG.md
 
 # Database
 *.db

@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authFetch } from '../api/client';
 import { BackArrow } from '../components/BackArrow';
+import { apiBase } from '../api/config';
 
-const AUTH_BASE = 'http://localhost:3000/api/auth';
+const AUTH_BASE = `${apiBase}/api/auth`;
 
 const AdminCreateUserPage = () => {
   const navigate = useNavigate();

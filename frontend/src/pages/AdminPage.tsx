@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import { authFetch } from '../api/client';
+import { apiBase } from '../api/config';
 
-const AUTH_BASE = 'http://localhost:3000/api/auth';
+const AUTH_BASE = `${apiBase}/api/auth`;
 
 interface User {
   userID: number;

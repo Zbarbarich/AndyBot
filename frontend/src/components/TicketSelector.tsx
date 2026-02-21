@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { authFetch } from '../api/client';
+import { apiBase } from '../api/config';
 
-const TICKETS_API = 'http://localhost:3000/api/app/tickets';
+const TICKETS_API = `${apiBase}/api/app/tickets`;
 
 export interface TicketOption {
   id: number;

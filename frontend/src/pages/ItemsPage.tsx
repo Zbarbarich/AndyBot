@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import { authFetch } from '../api/client';
+import { apiBase } from '../api/config';
 
-const API_BASE = 'http://localhost:3000/api/app/items';
+const API_BASE = `${apiBase}/api/app/items`;
 
 interface Item {
   id: number;

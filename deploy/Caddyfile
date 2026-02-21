@@ -1,0 +1,12 @@
+# Replace yourdomain.com with your actual domain before first run.
+# Caddy will obtain and renew a Let's Encrypt certificate automatically.
+
+yourdomain.com {
+    encode gzip
+    handle /api/* {
+        reverse_proxy api-gateway:3000
+    }
+    handle {
+        reverse_proxy frontend:80
+    }
+}

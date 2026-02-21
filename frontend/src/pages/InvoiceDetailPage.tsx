@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { authFetch } from '../api/client';
 import { BackArrow } from '../components/BackArrow';
 import { useDetailFetch } from '../hooks/useDetailFetch';
+import { apiBase } from '../api/config';
 
-const INVOICES_API = 'http://localhost:3000/api/app/invoices';
+const INVOICES_API = `${apiBase}/api/app/invoices`;
 
 interface InvoiceLine {
   id: number;
@@ -39,6 +40,7 @@ interface InvoiceDetail {
 
 const InvoiceDetailPage = () => {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const invoiceId = id ? parseInt(id, 10) : NaN;
   const validId = !isNaN(invoiceId);
   const url = validId ? `${INVOICES_API}/${invoiceId}` : null;

@@ -3,11 +3,10 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { authFetch } from '../api/client';
 import { formatDate } from '../utils/formatDate';
 import { BackArrow } from '../components/BackArrow';
+import { apiBase } from '../api/config';
 
-const CUSTOMERS_API = 'http://localhost:3000/api/app/customers';
-const TICKETS_API = 'http://localhost:3000/api/app/tickets';
-const ORDERS_API = 'http://localhost:3000/api/app/orders';
-const INVOICES_API = 'http://localhost:3000/api/app/invoices';
+const CUSTOMERS_API = `${apiBase}/api/app/customers`;
+const TICKETS_API = `${apiBase}/api/app/tickets`;
 
 interface Customer {
   id: number;

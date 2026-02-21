@@ -2,8 +2,9 @@ import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { authFetch } from '../api/client';
 import { formatDate } from '../utils/formatDate';
+import { apiBase } from '../api/config';
 
-const API_BASE = 'http://localhost:3000/api/app/purchase-orders';
+const API_BASE = `${apiBase}/api/app/purchase-orders`;
 
 type StatusFilter = 'open' | 'closed' | 'all';
 

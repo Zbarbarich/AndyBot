@@ -3,8 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import { useListFetch } from '../hooks/useListFetch';
 import { ErrorBanner } from '../components/ErrorBanner';
+import { apiBase } from '../api/config';
 
-const API_BASE = 'http://localhost:3000/api/app/invoices';
+const API_BASE = `${apiBase}/api/app/invoices`;
 
 type StatusFilter = 'open' | 'closed' | 'all';
 
