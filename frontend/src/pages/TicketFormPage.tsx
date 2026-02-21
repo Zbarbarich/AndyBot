@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authFetch } from '../api/client';
 import { BackArrow } from '../components/BackArrow';
+import { apiBase } from '../api/config';
 
-const API_BASE = 'http://localhost:3000/api/app/tickets';
-const CUSTOMERS_API = 'http://localhost:3000/api/app/customers';
+const API_BASE = `${apiBase}/api/app/tickets`;
+const CUSTOMERS_API = `${apiBase}/api/app/customers`;
 
 const TICKET_STATUSES = ['Open', 'Pending Closure Review', 'Closed'] as const;
 

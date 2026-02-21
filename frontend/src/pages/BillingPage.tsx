@@ -2,10 +2,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { BackArrow } from '../components/BackArrow';
 import { authFetch } from '../api/client';
+import { apiBase } from '../api/config';
 
-const ORDERS_API = 'http://localhost:3000/api/app/orders';
-
-type BillingStatus = 'pending' | 'billable' | 'invoiced';
+const ORDERS_API = `${apiBase}/api/app/orders`;
 
 interface Line {
   id: number;
@@ -194,7 +193,7 @@ const BillingPage = () => {
                   ) : (
                     <select
                       value={line.billing_status}
-                      onChange={(e) => updateLineBillingStatus(line.id, e.target.value as BillingStatus)}
+                      onChange={(e) => updateLineBillingStatus(line.id, e.target.value as 'pending' | 'billable')}
                       disabled={patchingLineId === line.id}
                       className="input-field w-full max-w-[120px]"
                     >

@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { authFetch } from '../api/client';
 import { BackArrow } from '../components/BackArrow';
+import { apiBase } from '../api/config';
 
-const API_BASE = 'http://localhost:3000/api/app/items';
+const API_BASE = `${apiBase}/api/app/items`;
 const UNIT_OPTIONS = ['EA', 'DZ', 'ST', 'HR'] as const;
 
 const ItemEditPage = () => {
@@ -35,12 +36,13 @@ const ItemEditPage = () => {
         if (!res.ok) throw new Error('Item not found');
         return res.json();
       })
-      .then((item: { name: string; category: string | null; description: string | null; unit_price: number; taxable: boolean; stock?: number; our_cost?: number }) => {
+      .then((item: { name: string; category: string | null; description: string | null; unit_price: number; unit_of_measure?: string | null; taxable: boolean; stock?: number; our_cost?: number }) => {
         setForm({
           name: item.name,
           category: item.category ?? '',
           description: item.description ?? '',
           unit_price: String(item.unit_price),
+          unit_of_measure: item.unit_of_measure ?? 'EA',
           taxable: item.taxable,
           stock: item.stock != null ? String(item.stock) : '',
           our_cost: item.our_cost != null ? String(item.our_cost) : '',

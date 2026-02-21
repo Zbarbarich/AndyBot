@@ -2,8 +2,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import { authFetch } from '../api/client';
+import { apiBase } from '../api/config';
 
-const API_BASE = 'http://localhost:3000/api/app/customers';
+const API_BASE = `${apiBase}/api/app/customers`;
 
 interface Customer {
   id: number;

@@ -2,10 +2,11 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { TicketSelector } from '../components/TicketSelector';
 import { authFetch } from '../api/client';
+import { apiBase } from '../api/config';
 
-const QUOTES_API = 'http://localhost:3000/api/app/quotes';
-const CUSTOMERS_API = 'http://localhost:3000/api/app/customers';
-const ITEMS_API = 'http://localhost:3000/api/app/items';
+const QUOTES_API = `${apiBase}/api/app/quotes`;
+const CUSTOMERS_API = `${apiBase}/api/app/customers`;
+const ITEMS_API = `${apiBase}/api/app/items`;
 
 interface Customer {
   id: number;

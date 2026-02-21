@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authFetch } from '../api/client';
 import { BackArrow } from '../components/BackArrow';
+import { apiBase } from '../api/config';
 
-const ORDERS_API = 'http://localhost:3000/api/app/orders';
+const ORDERS_API = `${apiBase}/api/app/orders`;
 
 interface OrderSummary {
   id: number;

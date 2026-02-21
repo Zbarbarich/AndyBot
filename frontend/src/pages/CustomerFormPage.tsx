@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authFetch } from '../api/client';
 import { BackArrow } from '../components/BackArrow';
+import { apiBase } from '../api/config';
 
-const API_BASE = 'http://localhost:3000/api/app/customers';
+const API_BASE = `${apiBase}/api/app/customers`;
 
 const CustomerFormPage = () => {
   const navigate = useNavigate();

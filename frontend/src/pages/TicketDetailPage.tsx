@@ -2,9 +2,10 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { authFetch } from '../api/client';
 import { BackArrow } from '../components/BackArrow';
+import { apiBase } from '../api/config';
 
-const TICKETS_API = 'http://localhost:3000/api/app/tickets';
-const CUSTOMERS_API = 'http://localhost:3000/api/app/customers';
+const TICKETS_API = `${apiBase}/api/app/tickets`;
+const CUSTOMERS_API = `${apiBase}/api/app/customers`;
 
 interface ResolutionUpdate {
   id: number;

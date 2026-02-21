@@ -2,9 +2,10 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import { authFetch } from '../api/client';
+import { apiBase } from '../api/config';
 
-const API_BASE = 'http://localhost:3000/api/app/tickets';
-const ORDERS_API = 'http://localhost:3000/api/app/orders';
+const API_BASE = `${apiBase}/api/app/tickets`;
+const ORDERS_API = `${apiBase}/api/app/orders`;
 
 type StatusFilter = 'open' | 'closed' | 'all';
 

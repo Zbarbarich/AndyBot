@@ -2,8 +2,9 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Search, Users, Ticket, FileText, Receipt, Package } from 'lucide-react';
 import { authFetch } from '../api/client';
+import { apiBase } from '../api/config';
 
-const API_BASE = 'http://localhost:3000/api/app';
+const API_BASE = `${apiBase}/api/app`;
 
 interface SearchResults {
   customers: { id: number; name: string }[];

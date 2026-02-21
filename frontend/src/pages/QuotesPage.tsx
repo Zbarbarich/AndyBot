@@ -3,8 +3,9 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import { authFetch } from '../api/client';
 import { formatDate } from '../utils/formatDate';
+import { apiBase } from '../api/config';
 
-const API_BASE = 'http://localhost:3000/api/app/quotes';
+const API_BASE = `${apiBase}/api/app/quotes`;
 
 interface QuoteSummary {
   id: number;

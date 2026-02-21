@@ -4,11 +4,12 @@ import { BackArrow } from '../components/BackArrow';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { TicketSelector } from '../components/TicketSelector';
 import { authFetch } from '../api/client';
+import { apiBase } from '../api/config';
 
-const ORDERS_API = 'http://localhost:3000/api/app/orders';
-const QUOTES_API = 'http://localhost:3000/api/app/quotes';
-const CUSTOMERS_API = 'http://localhost:3000/api/app/customers';
-const ITEMS_API = 'http://localhost:3000/api/app/items';
+const ORDERS_API = `${apiBase}/api/app/orders`;
+const QUOTES_API = `${apiBase}/api/app/quotes`;
+const CUSTOMERS_API = `${apiBase}/api/app/customers`;
+const ITEMS_API = `${apiBase}/api/app/items`;
 
 interface Customer {
   id: number;
@@ -336,7 +337,7 @@ const OrderDetailPage = () => {
 
   const addLine = () => setLines((prev) => [...prev, emptyLine()]);
   const removeLine = (index: number) => setLines((prev) => prev.filter((_, i) => i !== index));
-  const updateLine = (index: number, field: keyof LineRow, value: number | string | null) => {
+  const updateLine = (index: number, field: keyof LineRow, value: number | string | boolean | null) => {
     setLines((prev) => {
       const next = [...prev];
       next[index] = { ...next[index], [field]: value };
@@ -616,7 +617,7 @@ const OrderDetailPage = () => {
                             min="0"
                             step="0.01"
                             value={line.po_unit_cost ?? ''}
-                            onChange={(e) => updateLine(idx, 'po_unit_cost', e.target.value === '' ? undefined : parseFloat(e.target.value) || 0)}
+                            onChange={(e) => updateLine(idx, 'po_unit_cost', e.target.value === '' ? null : parseFloat(e.target.value) || 0)}
                             className="input-field py-1.5 px-2 text-sm min-h-0 w-20 text-right"
                             placeholder="0"
                           />

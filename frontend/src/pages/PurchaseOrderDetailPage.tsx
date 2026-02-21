@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { BackArrow } from '../components/BackArrow';
 import { authFetch } from '../api/client';
 import { formatDate } from '../utils/formatDate';
+import { apiBase } from '../api/config';
 
-const API_BASE = 'http://localhost:3000/api/app/purchase-orders';
+const API_BASE = `${apiBase}/api/app/purchase-orders`;
 
 interface POLine {
   id: number;
@@ -34,7 +35,6 @@ const ORDERED_VIA_OPTIONS = ['Email', 'Phone', 'Vendor portal', 'Fax', 'Other'];
 
 const PurchaseOrderDetailPage = () => {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
   const [po, setPo] = useState<PurchaseOrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
