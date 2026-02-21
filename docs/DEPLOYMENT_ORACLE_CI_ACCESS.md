@@ -174,6 +174,8 @@ SSL is handled entirely by **Caddy** on the VPS — no manual cert steps.
 
 6. **Build and start everything:**
 
+   - **If the instance has only 1 GB RAM (e.g. AMD VM.Standard.E2.1.Micro):** add swap first or the parallel build can freeze (OOM). Run once: `sudo bash deploy/add-swap.sh`. See `deploy/README.md` → [Build issues on small instances](deploy/README.md#build-issues-on-small-instances).
+
    ```bash
    docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d --build
    ```
