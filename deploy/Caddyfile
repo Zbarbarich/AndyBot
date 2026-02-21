@@ -1,8 +1,7 @@
 # Replace yourdomain.com with your actual domain before first run.
 # Caddy will obtain and renew a Let's Encrypt certificate automatically.
-# For IP-only access: http://138.2.220.34 or https://138.2.220.34 (browser will show cert warning; proceed to continue).
-138.2.220.34 {
-    tls internal
+# IP-only (no TLS): use http://138.2.220.34 so Caddy does not redirect HTTP→HTTPS.
+http://138.2.220.34 {
     encode gzip
     handle /api/* {
         reverse_proxy api-gateway:3000
