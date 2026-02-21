@@ -16,12 +16,29 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Check deploy secrets
+        run: |
+          if [ -z "${{ secrets.SSH_HOST }}" ]; then
+            echo "::error::SSH_HOST secret is not set. Add it in repo Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+          if [ -z "${{ secrets.SSH_USER }}" ]; then
+            echo "::error::SSH_USER secret is not set. Add it in repo Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+          if [ -z "${{ secrets.SSH_PRIVATE_KEY }}" ]; then
+            echo "::error::SSH_PRIVATE_KEY secret is not set. Add it in repo Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+          echo "Deploy secrets present."
+
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          command_timeout: 60m
           script: |
             set -e
             if [ -n "$DEPLOY_PATH" ]; then
