@@ -1,7 +1,7 @@
 {
   "name": "the-nineteenth-chamber",
   "version": "1.0.0",
-  "description": "Personal tech companies ticket/ERP system - The Nineteenth Chamber",
+  "description": "A.N.D.Y. – Advanced Notation & Deployment Yard (19th Chamber Integrated)",
   "scripts": {
     "start": "concurrently \"npm run start:frontend\" \"npm run start:api-gateway\" \"npm run start:auth-service\" \"npm run start:customer-service\" \"npm run start:ticket-service\" \"npm run start:order-service\" \"npm run start:invoice-service\" \"npm run start:pdf-service\"",
     "dev": "npm start",

@@ -188,7 +188,7 @@ export const invoiceController = {
         await client.query(invoiceQueries.addOrderLineQuantityBilled, [l.id, quantityToBill]);
       }
 
-      const countResult = await client.query(invoiceQueries.countOrderLinesNotInvoiced, [orderId]);
+      const countResult = await client.query(invoiceQueries.countOrderLinesNotFullyInvoiced, [orderId]);
       if (countResult.rows[0].count === 0) {
         await client.query(invoiceQueries.setOrderClosed, [orderId]);
       }
@@ -274,10 +274,28 @@ export const invoiceController = {
       }
       await query(invoiceQueries.deletePayment, [paymentId, invoiceId]);
       await query(invoiceQueries.syncInvoiceAmountPaid, [invoiceId]);
-      const fullInvoice = await query(invoiceQueries.getById, [invoiceId]);
+
+      // Reopen order lines and order: subtract billed quantities and set order back to open
+      const invDoc = (await query(invoiceQueries.getById, [invoiceId])).rows[0] as { order_id: number };
+      const orderId = invDoc.order_id;
       const linesResult = await query(invoiceQueries.getLinesByInvoiceId, [invoiceId]);
+      const invoiceLines = linesResult.rows as Array<{ order_line_id: number; quantity: number | string }>;
+      for (const row of invoiceLines) {
+        const qty = Number(row.quantity);
+        if (row.order_line_id != null && Number.isFinite(qty) && qty > 0) {
+          await query(invoiceQueries.subtractOrderLineQuantityBilled, [row.order_line_id, qty]);
+        }
+      }
+      const orderResult = await query(orderQueries.getById, [orderId]);
+      const order = orderResult.rows[0] as { status?: string } | undefined;
+      if (order?.status === 'closed') {
+        await query(invoiceQueries.setOrderOpen, [orderId]);
+      }
+
+      const fullInvoice = await query(invoiceQueries.getById, [invoiceId]);
+      const linesResult2 = await query(invoiceQueries.getLinesByInvoiceId, [invoiceId]);
       const paymentsResult = await query(invoiceQueries.getPaymentsByInvoiceId, [invoiceId]);
-      res.json({ ...fullInvoice.rows[0], lines: linesResult.rows, payments: paymentsResult.rows });
+      res.json({ ...fullInvoice.rows[0], lines: linesResult2.rows, payments: paymentsResult.rows });
     } catch (e) {
       console.error('invoiceController.deletePayment', e);
       res.status(500).json({ error: 'Failed to reverse payment' });

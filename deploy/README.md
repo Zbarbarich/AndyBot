@@ -1,4 +1,4 @@
-# Deploy — The Nineteenth Chamber
+# Deploy — A.N.D.Y. (19th Chamber Integrated)
 
 Single-instance Docker Compose deployment with Caddy (HTTPS), PostgreSQL, and all backend/frontend services.
 

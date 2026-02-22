@@ -44,9 +44,10 @@ const LoginPage = () => {
     <div className="min-h-screen bg-dark-bg flex items-center justify-center p-4 sm:p-6 safe-area-pb">
       <div className="w-full max-w-md">
         <div className="border border-dark-border rounded-xl p-6 sm:p-8 bg-dark-surface shadow-xl">
-          <h1 className="text-xl sm:text-2xl font-semibold mb-6 sm:mb-8 text-center text-dark-text">
-            The Nineteenth Chamber
-          </h1>
+          <div className="mb-6 sm:mb-8 text-center">
+            <h1 className="text-xl sm:text-2xl font-semibold text-dark-text">A.N.D.Y.</h1>
+            <p className="text-sm text-dark-text-muted mt-1">Advanced Notation & Deployment Yard</p>
+          </div>
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
               <label className="block text-sm font-medium mb-2 text-dark-text-muted">

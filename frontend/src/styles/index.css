@@ -193,7 +193,7 @@
 
 
 /* Common Elements - touch-friendly. Exclude all app-styled buttons so they use component classes only (pill shape, no extra box). */
-button:not(.btn-icon-primary):not(.btn-primary):not(.btn-secondary):not(.pill-button) {
+button:not(.btn-icon-primary):not(.btn-primary):not(.btn-secondary):not(.pill-button):not(.btn-sidebar-chevron) {
   border-radius: var(--border-radius);
   border: 1px solid transparent;
   padding: 0.5rem 0.75rem;
@@ -206,18 +206,18 @@ button:not(.btn-icon-primary):not(.btn-primary):not(.btn-secondary):not(.pill-bu
   min-width: 44px;
 }
 @media (min-width: 640px) {
-  button:not(.btn-icon-primary):not(.btn-primary):not(.btn-secondary):not(.pill-button) {
+  button:not(.btn-icon-primary):not(.btn-primary):not(.btn-secondary):not(.pill-button):not(.btn-sidebar-chevron) {
     padding: clamp(0.4em, 1vw, 0.6em) clamp(0.8em, 2vw, 1.2em);
     min-width: 0;
   }
 }
 
-button:not(.btn-icon-primary):not(.btn-primary):not(.btn-secondary):not(.pill-button):hover {
+button:not(.btn-icon-primary):not(.btn-primary):not(.btn-secondary):not(.pill-button):not(.btn-sidebar-chevron):hover {
   border-color: var(--primary-color);
 }
 
-button:not(.btn-icon-primary):not(.btn-primary):not(.btn-secondary):not(.pill-button):focus,
-button:not(.btn-icon-primary):not(.btn-primary):not(.btn-secondary):not(.pill-button):focus-visible {
+button:not(.btn-icon-primary):not(.btn-primary):not(.btn-secondary):not(.pill-button):not(.btn-sidebar-chevron):focus,
+button:not(.btn-icon-primary):not(.btn-primary):not(.btn-secondary):not(.pill-button):not(.btn-sidebar-chevron):focus-visible {
   outline: 2px solid var(--primary-color);
   outline-offset: 2px;
 }

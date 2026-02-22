@@ -93,10 +93,29 @@ const invoiceQueries = {
     RETURNING id, quantity_billed, billing_status
   `,
 
+  /** Subtract quantity_billed (payment reversal); set billing_status to 'billable' when quantity_billed becomes 0. */
+  subtractOrderLineQuantityBilled: `
+    UPDATE quote_order_lines
+    SET quantity_billed = GREATEST(0, COALESCE(quantity_billed, 0) - $2),
+        billing_status = CASE WHEN (COALESCE(quantity_billed, 0) - $2) <= 0 THEN 'billable' ELSE billing_status END
+    WHERE id = $1
+    RETURNING id, quantity_billed, billing_status
+  `,
+
+  setOrderOpen: `UPDATE quotes_orders SET status = 'open', updated_at = NOW() WHERE id = $1 AND type = 'order' RETURNING id`,
+
   countOrderLinesNotInvoiced: `
     SELECT COUNT(*)::int AS count
     FROM quote_order_lines
     WHERE quote_order_id = $1 AND billing_status = 'billable' AND (quantity - COALESCE(quantity_billed, 0)) > 0
+  `,
+
+  /** Count lines that are not fully invoiced (pending, billable with remaining, or partial). Close order only when this is 0. */
+  countOrderLinesNotFullyInvoiced: `
+    SELECT COUNT(*)::int AS count
+    FROM quote_order_lines
+    WHERE quote_order_id = $1
+      AND (billing_status != 'invoiced' OR COALESCE(quantity_billed, 0) < quantity)
   `,
 
   setOrderClosed: `UPDATE quotes_orders SET status = 'closed', updated_at = NOW() WHERE id = $1 AND type = 'order' RETURNING id`,
@@ -125,9 +144,10 @@ const invoiceQueries = {
     RETURNING id, invoice_id, amount, payment_method, paid_at, reference
   `,
 
+  /** amount_paid = raw sum of payments (no cap), so balance_due can go negative (deposit overpayment). */
   syncInvoiceAmountPaid: `
     UPDATE invoices i
-    SET amount_paid = LEAST((SELECT COALESCE(SUM(amount), 0)::numeric FROM invoice_payments WHERE invoice_id = i.id), i.total),
+    SET amount_paid = (SELECT COALESCE(SUM(amount), 0)::numeric FROM invoice_payments WHERE invoice_id = i.id),
         payment_method = (SELECT payment_method FROM invoice_payments WHERE invoice_id = i.id ORDER BY paid_at DESC LIMIT 1),
         paid_at = CASE WHEN (SELECT COALESCE(SUM(amount), 0)::numeric FROM invoice_payments WHERE invoice_id = i.id) >= i.total
           THEN (SELECT MAX(paid_at) FROM invoice_payments WHERE invoice_id = i.id) ELSE paid_at END,

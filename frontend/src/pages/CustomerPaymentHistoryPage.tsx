@@ -143,6 +143,7 @@ const CustomerPaymentHistoryPage = () => {
           No payments recorded for this customer.
         </div>
       ) : (
+        <>
         <div className="table-scroll overflow-x-auto">
           <table>
             <thead>
@@ -232,8 +233,32 @@ const CustomerPaymentHistoryPage = () => {
                 );
               })}
             </tbody>
+            <tfoot className="text-dark-text border-t border-dark-border font-medium">
+              <tr>
+                <td colSpan={2} className="py-2 px-2 text-right">Invoice payments</td>
+                <td className="col-amount py-2 px-2">
+                  ${payments.filter((r) => r.payment_type === 'invoice').reduce((sum, r) => sum + Number(r.amount), 0).toFixed(2)}
+                </td>
+                <td colSpan={5} />
+              </tr>
+              <tr>
+                <td colSpan={2} className="py-2 px-2 text-right">Deposits</td>
+                <td className="col-amount py-2 px-2">
+                  ${payments.filter((r) => r.payment_type === 'deposit').reduce((sum, r) => sum + Number(r.amount), 0).toFixed(2)}
+                </td>
+                <td colSpan={5} />
+              </tr>
+              <tr>
+                <td colSpan={2} className="py-2 px-2 text-right">Total</td>
+                <td className="col-amount py-2 px-2">
+                  ${payments.reduce((sum, r) => sum + Number(r.amount), 0).toFixed(2)}
+                </td>
+                <td colSpan={5} />
+              </tr>
+            </tfoot>
           </table>
         </div>
+        </>
       )}
     </div>
   );

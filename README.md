@@ -1,6 +1,6 @@
-# The Nineteenth Chamber
+# A.N.D.Y. – Advanced Notation & Deployment Yard
 
-A personal tech company ticket and ERP system built with React, TypeScript, Node.js, Express, and PostgreSQL.
+A personal tech company ticket and ERP system by 19th Chamber Integrated, built with React, TypeScript, Node.js, Express, and PostgreSQL.
 
 ## Tech Stack
 
@@ -182,10 +182,10 @@ App services use additional tables for customers, tickets, orders, quotes, invoi
 
 The frontend is a single-page application with protected routes. Login persists the JWT and user in AuthContext (and localStorage). The authenticated layout (AppLayout) includes:
 
-- A collapsible sidebar with Lucide icons (Home, Customers, Tickets, Orders, Invoices, Purchasing, Items, Admin)
+- A collapsible sidebar with A.N.D.Y. branding (Bot icon + “A.N.D.Y.” and tagline when expanded; Bot icon only when collapsed), then nav links: The Yard, Customers, Tickets, Begin Order, Invoices, Purchasing, Items, Admin. Sidebar expand/collapse chevron is borderless and transparent.
 - A header with global search (pill-shaped, debounced input; grouped results: customers, tickets, orders/quotes, invoices, purchase orders, items) and a profile dropdown (logged-in user, logout)
 
-**Routes:** `/` (Landing), `/customers`, `/customers/new`, `/customers/:id`, `/customers/:id/payment-history`, `/tickets`, `/tickets/new`, `/tickets/:id`, `/tickets/:id/edit`, `/orders`, `/orders/:id`, `/orders/:id/billing`, `/invoices`, `/invoices/bill-order`, `/invoices/:id`, `/purchasing`, `/purchasing/:id`, `/items`, `/items/new`, `/items/:id`, `/items/:id/edit`, `/admin`, `/admin/users/new`. Quotes redirect to orders.
+**Routes:** `/` (The Yard), `/customers`, `/customers/new`, `/customers/:id`, `/customers/:id/payment-history`, `/tickets`, `/tickets/new`, `/tickets/:id`, `/tickets/:id/edit`, `/orders`, `/orders/:id`, `/orders/:id/billing`, `/invoices`, `/invoices/bill-order`, `/invoices/:id`, `/purchasing`, `/purchasing/:id`, `/items`, `/items/new`, `/items/:id`, `/items/:id/edit`, `/admin`, `/admin/users/new`. Quotes redirect to orders.
 
 **Pages:** Landing, Customers, Customer form/detail, Customer payment history (with reverse payment), Tickets, Ticket form/detail/edit, Orders (and quotes), Order/Quote detail (deposits, POs), Billing (per order), Invoices, Bill order, Invoice detail, Purchasing, Purchase order detail, Items (list/form/detail/edit), Admin (users, create user).
 
