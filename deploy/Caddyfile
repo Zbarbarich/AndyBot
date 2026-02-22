@@ -11,7 +11,7 @@ http://138.2.220.34 {
     }
 }
 
-yourdomain.com {
+andy-bot.com, www.andy-bot.com {
     encode gzip
     handle /api/* {
         reverse_proxy api-gateway:3000
