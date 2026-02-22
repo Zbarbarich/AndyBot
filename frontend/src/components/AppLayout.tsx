@@ -14,12 +14,13 @@ import {
   LogOut,
   Menu,
   X,
+  Bot,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import GlobalSearch from './GlobalSearch';
 
 function getPageTitle(pathname: string): string {
-  if (pathname === '/') return 'Home';
+  if (pathname === '/') return 'The Yard';
   if (pathname === '/customers') return 'Customers';
   if (pathname === '/customers/new') return 'New Customer';
   if (/^\/customers\/\d+$/.test(pathname)) return 'Customer';
@@ -41,11 +42,11 @@ function getPageTitle(pathname: string): string {
   if (pathname === '/admin/users/new') return 'Create User';
   if (pathname === '/purchasing') return 'Purchasing';
   if (/^\/purchasing\/\d+$/.test(pathname)) return 'Purchase Order';
-  return '19th Chamber';
+  return 'A.N.D.Y.';
 }
 
 const navLinks = [
-  { to: '/', label: 'Home', icon: Home },
+  { to: '/', label: 'The Yard', icon: Home },
   { to: '/customers', label: 'Customers', icon: Users },
   { to: '/tickets', label: 'Tickets', icon: Ticket },
   { to: '/orders', label: 'Begin Order', icon: ShoppingCart },
@@ -90,25 +91,44 @@ const AppLayout = () => {
       {/* Desktop sidebar (lg only) */}
       <aside
         className={`hidden lg:flex flex-col border-r border-dark-border bg-dark-surface transition-[width] duration-200 ${
-          sidebarCollapsed ? 'lg:w-[56px]' : 'lg:w-52'
+          sidebarCollapsed ? 'lg:w-[96px]' : 'lg:w-52'
         }`}
       >
-        <div className="p-2 flex items-center justify-between border-b border-dark-border min-h-[44px]">
-          {!sidebarCollapsed && (
-            <Link to="/" className="text-lg font-semibold text-primary truncate">
-              19th Chamber
-            </Link>
+        <div className={`p-2 border-b border-dark-border min-h-[44px] ${sidebarCollapsed ? 'grid grid-cols-[1fr_auto_1fr] items-center gap-1' : 'flex items-center gap-2'}`}>
+          {sidebarCollapsed ? (
+            <>
+              <div className="min-w-0" aria-hidden="true" />
+              <Link to="/" className="flex items-center justify-center p-1 ml-5 rounded text-primary hover:bg-dark-surface-elevated" aria-label="The Yard">
+                <Bot className="w-6 h-6 shrink-0 text-primary" />
+              </Link>
+              <button
+                type="button"
+                onClick={() => setSidebarCollapsed((c) => !c)}
+                className="btn-sidebar-chevron flex items-center justify-center p-2 bg-transparent border-0 rounded text-dark-text-muted hover:text-dark-text focus:outline-none focus:ring-0 justify-self-end"
+                aria-label="Expand sidebar"
+              >
+                <ChevronLeft className="w-5 h-5 rotate-180" />
+              </button>
+            </>
+          ) : (
+            <>
+              <Link to="/" className="min-w-0 flex-1 flex flex-col justify-center p-1 py-0.5 ml-8">
+                <div className="flex items-center gap-1.5">
+                  <Bot className="w-5 h-5 shrink-0 text-primary -mt-1" />
+                  <span className="text-lg font-semibold text-primary leading-tight">A.N.D.Y.</span>
+                </div>
+                <span className="text-[10px] text-dark-text-muted leading-tight break-words line-clamp-2 mt-0.5 text-center block">Advanced Notation & Deployment Yard</span>
+              </Link>
+              <button
+                type="button"
+                onClick={() => setSidebarCollapsed((c) => !c)}
+                className="btn-sidebar-chevron shrink-0 p-2 bg-transparent border-0 rounded text-dark-text-muted hover:text-dark-text focus:outline-none focus:ring-0 flex items-center justify-center"
+                aria-label="Collapse sidebar"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+            </>
           )}
-          <button
-            type="button"
-            onClick={() => setSidebarCollapsed((c) => !c)}
-            className="p-2 rounded text-dark-text-muted hover:text-dark-text hover:bg-dark-surface-elevated shrink-0"
-            aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          >
-            <ChevronLeft
-              className={`w-5 h-5 transition-transform ${sidebarCollapsed ? 'rotate-180' : ''}`}
-            />
-          </button>
         </div>
         <nav className="flex-1 py-2 overflow-y-auto">
           {navLinks.map(({ to, label, icon: Icon }) => (

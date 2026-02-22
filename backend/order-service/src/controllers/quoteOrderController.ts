@@ -176,11 +176,12 @@ export const quoteOrderController = {
         const qty = parseFloat(String(l.quantity)) || 1;
         const up = parseFloat(String(l.unit_price)) || 0;
         let sku: string | null = null;
-        let unitOfMeasure: string = (l.unit_of_measure && String(l.unit_of_measure).trim()) ? String(l.unit_of_measure).trim() : 'EA';
+        const clientUom = l.unit_of_measure != null ? String(l.unit_of_measure).trim() : '';
+        let unitOfMeasure: string = clientUom || 'EA';
         if (l.item_id != null) {
           const skuRes = await query(itemQueries.getSkuById, [l.item_id]);
           if (skuRes.rows[0]) sku = skuRes.rows[0].sku;
-          if (unitOfMeasure === 'EA') {
+          if (!clientUom) {
             const itemRes = await query(itemQueries.getById, [l.item_id]);
             if (itemRes.rows[0]?.unit_of_measure) unitOfMeasure = itemRes.rows[0].unit_of_measure;
           }
@@ -260,11 +261,12 @@ export const quoteOrderController = {
         const qty = parseFloat(String(l.quantity)) || 1;
         const up = parseFloat(String(l.unit_price)) || 0;
         let sku: string | null = null;
-        let unitOfMeasure: string = (l.unit_of_measure && String(l.unit_of_measure).trim()) ? String(l.unit_of_measure).trim() : 'EA';
+        const clientUom = l.unit_of_measure != null ? String(l.unit_of_measure).trim() : '';
+        let unitOfMeasure: string = clientUom || 'EA';
         if (l.item_id != null) {
           const skuRes = await query(itemQueries.getSkuById, [l.item_id]);
           if (skuRes.rows[0]) sku = skuRes.rows[0].sku;
-          if (unitOfMeasure === 'EA') {
+          if (!clientUom) {
             const itemRes = await query(itemQueries.getById, [l.item_id]);
             if (itemRes.rows[0]?.unit_of_measure) unitOfMeasure = itemRes.rows[0].unit_of_measure;
           }
@@ -392,11 +394,12 @@ export const quoteOrderController = {
         const qty = parseFloat(String(l.quantity)) || 1;
         const up = parseFloat(String(l.unit_price)) || 0;
         let sku: string | null = null;
-        let unitOfMeasure: string = (l.unit_of_measure && String(l.unit_of_measure).trim()) ? String(l.unit_of_measure).trim() : 'EA';
+        const clientUom = l.unit_of_measure != null ? String(l.unit_of_measure).trim() : '';
+        let unitOfMeasure: string = clientUom || 'EA';
         if (l.item_id != null) {
           const skuRes = await query(itemQueries.getSkuById, [l.item_id]);
           if (skuRes.rows[0]) sku = skuRes.rows[0].sku;
-          if (unitOfMeasure === 'EA') {
+          if (!clientUom) {
             const itemRes = await query(itemQueries.getById, [l.item_id]);
             if (itemRes.rows[0]?.unit_of_measure) unitOfMeasure = itemRes.rows[0].unit_of_measure;
           }
@@ -473,11 +476,12 @@ export const quoteOrderController = {
         const qty = parseFloat(String(l.quantity)) || 1;
         const up = parseFloat(String(l.unit_price)) || 0;
         let sku: string | null = null;
-        let unitOfMeasure: string = (l.unit_of_measure && String(l.unit_of_measure).trim()) ? String(l.unit_of_measure).trim() : 'EA';
+        const clientUom = l.unit_of_measure != null ? String(l.unit_of_measure).trim() : '';
+        let unitOfMeasure: string = clientUom || 'EA';
         if (l.item_id != null) {
           const skuRes = await query(itemQueries.getSkuById, [l.item_id]);
           if (skuRes.rows[0]) sku = skuRes.rows[0].sku;
-          if (unitOfMeasure === 'EA') {
+          if (!clientUom) {
             const itemRes = await query(itemQueries.getById, [l.item_id]);
             if (itemRes.rows[0]?.unit_of_measure) unitOfMeasure = itemRes.rows[0].unit_of_measure;
           }

@@ -1,6 +1,6 @@
 # Oracle Free Tier: Deployment, CI/CD, and Accessibility
 
-Detailed step-by-step plans for hosting The Nineteenth Chamber on Oracle Cloud Free Tier with HTTPS/SSL, a domain, GitHub Actions CI/CD, and access from phones and PCs.
+Detailed step-by-step plans for hosting A.N.D.Y. (19th Chamber Integrated) on Oracle Cloud Free Tier with HTTPS/SSL, a domain, GitHub Actions CI/CD, and access from phones and PCs.
 
 ---
 
