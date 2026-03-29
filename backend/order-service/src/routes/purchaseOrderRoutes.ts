@@ -9,5 +9,6 @@ router.get('/:id', purchaseOrderController.getById);
 router.patch('/:id/lines/:lineId/received', purchaseOrderController.updateLineReceived);
 router.patch('/:id/lines/:lineId', purchaseOrderController.updateLineOrdered);
 router.patch('/:id/close', purchaseOrderController.close);
+router.patch('/:id/cancel', purchaseOrderController.cancel);
 
 export default router;

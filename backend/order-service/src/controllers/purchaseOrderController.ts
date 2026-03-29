@@ -190,4 +190,24 @@ export const purchaseOrderController = {
       res.status(500).json({ error: 'Failed to close purchase order' });
     }
   },
+
+  /** Cancel an open PO (lines may be added to a new PO). */
+  async cancel(req: AppRequest, res: Response): Promise<void> {
+    try {
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) {
+        res.status(400).json({ error: 'Invalid id' });
+        return;
+      }
+      const result = await query(purchaseOrderQueries.cancelOpenPo, [id]);
+      if (result.rows.length === 0) {
+        res.status(400).json({ error: 'Purchase order not found or not open; only open POs can be cancelled.' });
+        return;
+      }
+      res.json(result.rows[0]);
+    } catch (e) {
+      console.error('purchaseOrderController.cancel', e);
+      res.status(500).json({ error: 'Failed to cancel purchase order' });
+    }
+  },
 };

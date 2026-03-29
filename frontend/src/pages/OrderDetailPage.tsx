@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { BackArrow } from '../components/BackArrow';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { TicketSelector } from '../components/TicketSelector';
@@ -36,6 +36,12 @@ interface InvoicedOnRow {
   quantity: number;
 }
 
+interface OnPurchaseOrderRow {
+  purchase_order_id: number;
+  po_number: string;
+  purchase_order_status: string;
+}
+
 interface LineRow {
   id?: number;
   item_id: number | null;
@@ -49,6 +55,8 @@ interface LineRow {
   billing_status: BillingStatus;
   quantity_billed?: number;
   invoiced_on?: InvoicedOnRow[];
+  /** Non-cancelled POs that include this line (order UI only). */
+  on_purchase_orders?: OnPurchaseOrderRow[];
   include_in_po?: boolean;
   po_unit_cost?: number;
 }
@@ -82,6 +90,7 @@ interface OrderDetail {
     billing_status: string;
     quantity_billed?: number;
     invoiced_on?: InvoicedOnRow[];
+    on_purchase_orders?: OnPurchaseOrderRow[];
     item_sku?: string;
     item_name?: string;
   }>;
@@ -229,9 +238,9 @@ const OrderDetailPage = () => {
         tax_rate: String(Number(data.tax_rate)),
         shipping_amount: String(Number(data.shipping_amount)),
       });
-      const newLines =
+      const newLines: LineRow[] =
         data.lines && data.lines.length > 0
-          ? data.lines.map((l: LineRow & { item_sku?: string; item_name?: string; unit_of_measure?: string | null; item_unit_of_measure?: string | null; quantity_billed?: number; invoiced_on?: InvoicedOnRow[] }, i: number) => ({
+          ? data.lines.map((l: LineRow & { item_sku?: string; item_name?: string; unit_of_measure?: string | null; item_unit_of_measure?: string | null; quantity_billed?: number; invoiced_on?: InvoicedOnRow[]; on_purchase_orders?: OnPurchaseOrderRow[] }, i: number) => ({
               id: l.id,
               item_id: l.item_id ?? null,
               item_sku: l.item_sku,
@@ -244,6 +253,7 @@ const OrderDetailPage = () => {
               billing_status: (l.billing_status || 'pending') as BillingStatus,
               quantity_billed: l.quantity_billed != null ? Number(l.quantity_billed) : undefined,
               invoiced_on: l.invoiced_on ?? undefined,
+              on_purchase_orders: l.on_purchase_orders ?? undefined,
               include_in_po: false,
               po_unit_cost: undefined,
             }))
@@ -408,7 +418,7 @@ const OrderDetailPage = () => {
       if (!res.ok) throw new Error(data.error || 'Failed to update document');
       setOrder({ ...order!, ...data });
       if (data.lines && data.lines.length > 0) {
-        const newLines = data.lines.map((l: LineRow & { item_sku?: string; item_name?: string; unit_of_measure?: string | null; item_unit_of_measure?: string | null; quantity_billed?: number; invoiced_on?: InvoicedOnRow[] }, i: number) => ({
+        const newLines: LineRow[] = data.lines.map((l: LineRow & { item_sku?: string; item_name?: string; unit_of_measure?: string | null; item_unit_of_measure?: string | null; quantity_billed?: number; invoiced_on?: InvoicedOnRow[]; on_purchase_orders?: OnPurchaseOrderRow[] }, i: number) => ({
           id: l.id,
           item_id: l.item_id ?? null,
           item_sku: l.item_sku,
@@ -421,6 +431,7 @@ const OrderDetailPage = () => {
           billing_status: (l.billing_status || 'pending') as BillingStatus,
           quantity_billed: l.quantity_billed != null ? Number(l.quantity_billed) : undefined,
           invoiced_on: l.invoiced_on ?? undefined,
+          on_purchase_orders: l.on_purchase_orders ?? undefined,
           include_in_po: false,
           po_unit_cost: undefined,
         }));
@@ -487,9 +498,9 @@ const OrderDetailPage = () => {
       tax_rate: String(Number(data.tax_rate)),
       shipping_amount: String(Number(data.shipping_amount)),
     });
-    const newLines =
+    const newLines: LineRow[] =
       data.lines && data.lines.length > 0
-        ? data.lines.map((l: LineRow & { item_sku?: string; item_name?: string; unit_of_measure?: string | null; item_unit_of_measure?: string | null; quantity_billed?: number; invoiced_on?: InvoicedOnRow[] }, i: number) => ({
+        ? data.lines.map((l: LineRow & { item_sku?: string; item_name?: string; unit_of_measure?: string | null; item_unit_of_measure?: string | null; quantity_billed?: number; invoiced_on?: InvoicedOnRow[]; on_purchase_orders?: OnPurchaseOrderRow[] }, i: number) => ({
             id: l.id,
             item_id: l.item_id ?? null,
             item_sku: l.item_sku,
@@ -502,6 +513,7 @@ const OrderDetailPage = () => {
             billing_status: (l.billing_status || 'pending') as BillingStatus,
             quantity_billed: l.quantity_billed != null ? Number(l.quantity_billed) : undefined,
             invoiced_on: l.invoiced_on ?? undefined,
+            on_purchase_orders: l.on_purchase_orders ?? undefined,
             include_in_po: false,
             po_unit_cost: undefined,
           }))
@@ -657,7 +669,14 @@ const OrderDetailPage = () => {
         {!isNew && order && (
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
             {readOnly ? (
-              <button type="button" onClick={() => setIsReadOnly(false)} className="link-primary">
+              <button
+                type="button"
+                onClick={() => {
+                  // Defer so this click’s mouseup cannot land on the Save button that replaces Edit (same slot).
+                  setTimeout(() => setIsReadOnly(false), 0);
+                }}
+                className="link-primary"
+              >
                 Edit
               </button>
             ) : (
@@ -901,7 +920,20 @@ const OrderDetailPage = () => {
                           disabled={readOnly}
                         />
                         {line.invoiced_on?.length ? (
-                          <div className="text-xs text-dark-text-muted mt-0.5">Invoiced on {line.invoiced_on.map((x) => x.sub_order_number).join(', ')}</div>
+                          <div className="text-xs text-dark-text-muted mt-0.5 whitespace-nowrap">Invoiced on {line.invoiced_on.map((x) => x.sub_order_number).join(', ')}</div>
+                        ) : null}
+                        {line.on_purchase_orders?.length ? (
+                          <div className="text-xs text-dark-text-muted mt-0.5 whitespace-nowrap">
+                            On purchase order{' '}
+                            {line.on_purchase_orders.map((po, pi) => (
+                              <span key={po.purchase_order_id}>
+                                {pi > 0 ? ', ' : ''}
+                                <Link to={`/purchasing/${po.purchase_order_id}`} className="link-primary">
+                                  {po.po_number}
+                                </Link>
+                              </span>
+                            ))}
+                          </div>
                         ) : null}
                       </td>
                       <td className="py-1.5 px-2 text-right align-top">
@@ -1154,10 +1186,13 @@ const OrderDetailPage = () => {
                       disabled={creatingPO}
                       onClick={() => {
                         setError('');
-                        const ids = (order.lines ?? [])
-                          .filter((l): l is typeof l & { id: number } => typeof l.id === 'number')
+                        const eligible = lines
+                          .filter(
+                            (l): l is LineRow & { id: number } =>
+                              typeof l.id === 'number' && !(l.on_purchase_orders?.length)
+                          )
                           .map((l) => l.id);
-                        setPoSelectedLineIds(new Set(ids));
+                        setPoSelectedLineIds(new Set(eligible));
                         setPoModalOpen(true);
                       }}
                       className="link-primary"
@@ -1230,15 +1265,17 @@ const OrderDetailPage = () => {
             </div>
             <div className="p-4 overflow-y-auto flex-1">
               <ul className="space-y-2">
-                {(order.lines ?? []).map((line) => {
+                {lines.map((line) => {
                   const lineId = line.id;
                   if (typeof lineId !== 'number') return null;
+                  const onPo = line.on_purchase_orders?.length;
                   const label = line.item_sku && line.item_name ? `${line.item_sku} – ${line.item_name}` : (line.description || '—');
                   return (
-                    <li key={lineId} className="flex items-center gap-3 py-2 border-b border-dark-border last:border-0">
+                    <li key={lineId} className="flex items-start gap-3 py-2 border-b border-dark-border last:border-0">
                       <input
                         type="checkbox"
                         id={`po-line-${lineId}`}
+                        disabled={!!onPo}
                         checked={poSelectedLineIds.has(lineId)}
                         onChange={(e) => {
                           setPoSelectedLineIds((prev) => {
@@ -1248,10 +1285,27 @@ const OrderDetailPage = () => {
                             return next;
                           });
                         }}
-                        className="rounded border-dark-border"
+                        className="rounded border-dark-border mt-0.5 shrink-0"
                       />
-                      <label htmlFor={`po-line-${lineId}`} className="flex-1 cursor-pointer text-dark-text text-sm">
-                        {label} — {Number(line.quantity)} × {Number(line.unit_price).toFixed(2)}
+                      <label
+                        htmlFor={`po-line-${lineId}`}
+                        className={`flex-1 text-sm ${onPo ? 'text-dark-text-muted cursor-not-allowed' : 'text-dark-text cursor-pointer'}`}
+                      >
+                        <span>{label} — {Number(line.quantity)} × {Number(line.unit_price).toFixed(2)}</span>
+                        {onPo ? (
+                          <span className="block text-xs mt-1 whitespace-nowrap">
+                            Already on{' '}
+                            {line.on_purchase_orders!.map((po, pi) => (
+                              <span key={po.purchase_order_id}>
+                                {pi > 0 ? ', ' : ''}
+                                <Link to={`/purchasing/${po.purchase_order_id}`} className="link-primary" onClick={(e) => e.stopPropagation()}>
+                                  {po.po_number}
+                                </Link>
+                              </span>
+                            ))}
+                            . Cancel that PO to include this line on a new one.
+                          </span>
+                        ) : null}
                       </label>
                     </li>
                   );

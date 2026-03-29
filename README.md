@@ -162,7 +162,7 @@ When running locally:
 
 **App (JWT required; gateway proxies to the appropriate service):**
 - Customers, tickets, orders, quotes, invoices, items, purchase orders, and PDFs are exposed under `/api/app/*`. The gateway proxies requests to customer-service, ticket-service, order-service, invoice-service, or pdf-service by path.
-- **Purchase orders:** `GET /api/app/purchase-orders`, `GET /api/app/purchase-orders/:id`, `GET /api/app/purchase-orders/:id/pdf` (proxied to order-service and pdf-service).
+- **Purchase orders:** `GET /api/app/purchase-orders`, `GET /api/app/purchase-orders/:id`, `PATCH /api/app/purchase-orders/:id/close`, `PATCH /api/app/purchase-orders/:id/cancel` (open POs only), `GET /api/app/purchase-orders/:id/pdf` (proxied to order-service and pdf-service).
 - **Global search:** `GET /api/app/search?q=<term>` returns aggregated results from customers, tickets, orders, invoices, items, and purchase orders: `{ customers, tickets, orders, invoices, items, purchase_orders }`.
 - **Customer payment history:** `GET /api/app/customers/:id/payment-history` returns all invoice payments and order deposits for that customer. Payments can be reversed via `DELETE /api/app/invoices/:id/payments/:paymentId` (invoice payments) or `DELETE /api/app/orders/:orderId/deposits/:depositId` (unapplied deposits only).
 
@@ -201,7 +201,9 @@ The frontend is a single-page application with protected routes. Login persists 
 
 **Orders & quotes:** Line quantity and unit price use text inputs while typing and commit on blur (so you can clear the field and type a new value). On an existing **order**, the default view is “Current order (remaining to bill)” — quantity shows **remaining** only while **read-only**; click **Edit** in the header to change full line quantities and prices. **Save** / **Cancel** live in the header next to the back control (not duplicated in the order summary). Saving validates that no line’s quantity is below what is already invoiced.
 
-**Purchase orders:** Detail shows customer contact fields; lines support ordered-via (including Online and Other with notes), mark received, and **Close PO** when all lines are received. Open PO lines that are not yet received are excluded from billable lines when creating invoices (invoice-service). PO detail includes **View PDF** and **Download PDF**.
+**Order detail & purchase orders (same line on multiple POs):** For **orders** only, `GET` and `PUT /api/app/orders/:id` attach **`on_purchase_orders`** to each line (non-cancelled POs that reference that line: id, `po_number`, status). The order screen shows a single-line note under the description, **On purchase order** with a link to each PO. **Create PO** pre-selects only lines not already on an open/closed PO; lines already on a PO appear in the modal with checkboxes disabled. **Cancelled** POs are omitted from `on_purchase_orders` and from the duplicate-line check when creating a PO, so those lines can be added to a new PO after **Cancel PO** on the purchase order detail page. **PDF and invoice output are unchanged** (pdf-service still loads raw order lines without this enrichment).
+
+**Purchase orders:** Detail shows customer contact fields; lines support ordered-via (including Online and Other with notes), mark received, **Cancel PO** (open POs only; frees linked order lines for a new PO), and **Close PO** when all lines are received. Open PO lines that are not yet received are excluded from billable lines when creating invoices (invoice-service). PO detail includes **View PDF** and **Download PDF**.
 
 **Tickets:** Attachments support images and other files; non-image types use file-type silhouettes. HEIC/HEIF is converted in the browser for preview (`heic2any`). Large uploads require the gateway JSON limit above.
 

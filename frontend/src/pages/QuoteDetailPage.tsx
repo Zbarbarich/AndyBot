@@ -156,7 +156,7 @@ const QuoteDetailPage = () => {
         tax_rate: String(Number(data.tax_rate)),
         shipping_amount: String(Number(data.shipping_amount)),
       });
-      const newLines =
+      const newLines: LineRow[] =
         data.lines && data.lines.length > 0
           ? data.lines.map((l: LineRow & { item_sku?: string; item_name?: string; unit_of_measure?: string | null; item_unit_of_measure?: string | null }, i: number) => ({
               id: l.id,
@@ -230,7 +230,7 @@ const QuoteDetailPage = () => {
       if (!res.ok) throw new Error(data.error || 'Failed to update quote');
       setQuote({ ...quote!, ...data });
       if (data.lines && Array.isArray(data.lines) && data.lines.length > 0) {
-        const newLines = data.lines.map((l: LineRow & { item_sku?: string; item_name?: string; unit_of_measure?: string | null; item_unit_of_measure?: string | null }, i: number) => ({
+        const newLines: LineRow[] = data.lines.map((l: LineRow & { item_sku?: string; item_name?: string; unit_of_measure?: string | null; item_unit_of_measure?: string | null }, i: number) => ({
           id: l.id,
           item_id: l.item_id ?? null,
           item_sku: l.item_sku,
@@ -296,7 +296,7 @@ const QuoteDetailPage = () => {
       tax_rate: String(Number(data.tax_rate)),
       shipping_amount: String(Number(data.shipping_amount)),
     });
-    const newLines =
+    const newLines: LineRow[] =
       data.lines && data.lines.length > 0
         ? data.lines.map((l: LineRow & { item_sku?: string; item_name?: string; unit_of_measure?: string | null; item_unit_of_measure?: string | null }, i: number) => ({
             id: l.id,

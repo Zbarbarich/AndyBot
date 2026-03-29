@@ -46,6 +46,7 @@ const PurchaseOrderDetailPage = () => {
   const [error, setError] = useState('');
   const [pdfLoading, setPdfLoading] = useState(false);
   const [closing, setClosing] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const [linePatchingId, setLinePatchingId] = useState<number | null>(null);
   const [lineEditId, setLineEditId] = useState<number | null>(null);
   const [lineOrderedVia, setLineOrderedVia] = useState('');
@@ -134,6 +135,23 @@ const PurchaseOrderDetailPage = () => {
       setError(e instanceof Error ? e.message : 'Failed to close purchase order');
     } finally {
       setClosing(false);
+    }
+  };
+
+  const handleCancelPo = async () => {
+    if (!po || po.status !== 'open') return;
+    if (!window.confirm('Cancel this purchase order? Order lines can be added to a new PO after cancellation.')) return;
+    setCancelling(true);
+    setError('');
+    try {
+      const res = await authFetch(`${API_BASE}/${po.id}/cancel`, { method: 'PATCH' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error((data as { error?: string }).error || 'Failed to cancel PO');
+      await fetchPo();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to cancel purchase order');
+    } finally {
+      setCancelling(false);
     }
   };
 
@@ -229,6 +247,16 @@ const PurchaseOrderDetailPage = () => {
         >
           {pdfLoading ? '…' : 'Download PDF'}
         </button>
+        {isOpen && (
+          <button
+            type="button"
+            onClick={handleCancelPo}
+            disabled={cancelling}
+            className="btn-text-action"
+          >
+            {cancelling ? 'Cancelling…' : 'Cancel PO'}
+          </button>
+        )}
         {isOpen && (
           <button
             type="button"

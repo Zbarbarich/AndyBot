@@ -8,6 +8,57 @@ import { AppRequest } from '../middleware/userContext';
 
 type LineInput = { item_id?: number; description?: string; quantity: number; unit_price: number; sort_order?: number; billing_status?: string; unit_of_measure?: string; include_in_po?: boolean; po_unit_cost?: number };
 
+type PoAssignment = { purchase_order_id: number; po_number: string; purchase_order_status: string };
+
+/** Invoice + PO extras for order line rows (order detail API only; not used by PDF services). */
+async function enrichOrderLinesForDetail(
+  orderId: number,
+  lines: Array<Record<string, unknown>>
+): Promise<Array<Record<string, unknown>>> {
+  const invLinesResult = await query(orderInvoiceQueries.getInvoiceLinesWithSubOrder, [orderId]);
+  const invLines = invLinesResult.rows as Array<{
+    order_line_id: number;
+    qty_invoiced: string;
+    sub_order_number: string;
+    invoice_number: string;
+  }>;
+  const invMap = new Map<number, Array<{ sub_order_number: string; invoice_number: string; quantity: number }>>();
+  for (const r of invLines) {
+    const list = invMap.get(r.order_line_id) ?? [];
+    list.push({
+      sub_order_number: r.sub_order_number,
+      invoice_number: r.invoice_number,
+      quantity: Number(r.qty_invoiced),
+    });
+    invMap.set(r.order_line_id, list);
+  }
+  const poResult = await query(purchaseOrderQueries.poAssignmentsForOrder, [orderId]);
+  const poRows = poResult.rows as Array<{
+    order_line_id: number;
+    purchase_order_id: number;
+    po_number: string;
+    purchase_order_status: string;
+  }>;
+  const poMap = new Map<number, PoAssignment[]>();
+  for (const r of poRows) {
+    const list = poMap.get(r.order_line_id) ?? [];
+    list.push({
+      purchase_order_id: r.purchase_order_id,
+      po_number: r.po_number,
+      purchase_order_status: r.purchase_order_status,
+    });
+    poMap.set(r.order_line_id, list);
+  }
+  return lines.map((l) => {
+    const lineId = l.id as number;
+    return {
+      ...l,
+      invoiced_on: invMap.get(lineId) ?? [],
+      on_purchase_orders: poMap.get(lineId) ?? [],
+    };
+  });
+}
+
 function computeTotals(lines: { quantity: number; unit_price: number }[], taxRate: number, shippingAmount: number) {
   const subtotal = lines.reduce((sum, l) => sum + Number(l.quantity) * Number(l.unit_price), 0);
   const taxAmount = subtotal * Number(taxRate);
@@ -101,22 +152,7 @@ export const quoteOrderController = {
       let lines = linesResult.rows as Array<Record<string, unknown>>;
 
       if (doc.type === 'order') {
-        const invLinesResult = await query(orderInvoiceQueries.getInvoiceLinesWithSubOrder, [id]);
-        const invLines = invLinesResult.rows as Array<{ order_line_id: number; qty_invoiced: string; sub_order_number: string; invoice_number: string }>;
-        const map = new Map<number, Array<{ sub_order_number: string; invoice_number: string; quantity: number }>>();
-        for (const r of invLines) {
-          const list = map.get(r.order_line_id) ?? [];
-          list.push({
-            sub_order_number: r.sub_order_number,
-            invoice_number: r.invoice_number,
-            quantity: Number(r.qty_invoiced),
-          });
-          map.set(r.order_line_id, list);
-        }
-        lines = lines.map((l) => {
-          const lineId = l.id as number;
-          return { ...l, invoiced_on: map.get(lineId) ?? [] };
-        });
+        lines = await enrichOrderLinesForDetail(id, lines);
       }
 
       res.json({ ...doc, lines });
@@ -503,7 +539,9 @@ export const quoteOrderController = {
 
       const updated = await query(quoteOrderQueries.getByIdWithCustomer, [id]);
       const linesResult = await query(quoteOrderQueries.getLinesByQuoteOrderId, [id]);
-      res.json({ ...updated.rows[0], lines: linesResult.rows });
+      let outLines = linesResult.rows as Array<Record<string, unknown>>;
+      outLines = await enrichOrderLinesForDetail(id, outLines);
+      res.json({ ...updated.rows[0], lines: outLines });
     } catch (e) {
       console.error('quoteOrderController.updateOrder', e);
       res.status(500).json({ error: 'Failed to update order' });
