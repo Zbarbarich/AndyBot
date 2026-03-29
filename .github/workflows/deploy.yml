@@ -3,6 +3,8 @@
 # Manual test: Actions → Deploy to VPS → Run workflow → pick branch + "Branch to deploy on VPS".
 # Required secrets: SSH_HOST, SSH_USER, SSH_PRIVATE_KEY
 # Optional: DEPLOY_PATH (absolute path on VPS, e.g. /home/opc/theNineteenthChamber)
+# Optional: GH_DEPLOY_TOKEN — PAT with Contents: Read; needed if VPS uses HTTPS origin without creds.
+# appleboy/ssh-action requires envs: so variables reach the remote shell (see with.envs below).
 
 name: Deploy to VPS
 
@@ -47,17 +49,32 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           command_timeout: 60m
+          # Without this, env vars are NOT sent to the remote; DEPLOY_GIT_REF was empty (origin/).
+          envs: DEPLOY_PATH,DEPLOY_GIT_REF,GH_DEPLOY_TOKEN,GITHUB_REPO_SLUG
           script: |
             set -e
             export GIT_TERMINAL_PROMPT=0
+            if [ -z "${DEPLOY_GIT_REF:-}" ]; then
+              echo "ERROR: DEPLOY_GIT_REF is empty. Check ssh-action with.envs includes DEPLOY_GIT_REF."
+              exit 1
+            fi
             if [ -n "$DEPLOY_PATH" ]; then
               cd "$DEPLOY_PATH"
             else
               cd ~/theNineteenthChamber
             fi
             echo "Deploying origin/${DEPLOY_GIT_REF} on VPS..."
+            ORIGIN_URL="$(git remote get-url origin)"
+            restore_origin() { git remote set-url origin "$ORIGIN_URL"; }
+            trap restore_origin EXIT
+            if [ -n "${GH_DEPLOY_TOKEN:-}" ] && [ -n "${GITHUB_REPO_SLUG:-}" ]; then
+              echo "Using GH_DEPLOY_TOKEN for this fetch only (origin restored after)."
+              git remote set-url origin "https://x-access-token:${GH_DEPLOY_TOKEN}@github.com/${GITHUB_REPO_SLUG}.git"
+            fi
             git fetch origin
             git reset --hard "origin/${DEPLOY_GIT_REF}"
+            restore_origin
+            trap - EXIT
             echo "Building from commit:"
             git log -1 --oneline
             git rev-parse HEAD
@@ -68,3 +85,5 @@ jobs:
         env:
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
           DEPLOY_GIT_REF: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_ref || github.ref_name }}
+          GH_DEPLOY_TOKEN: ${{ secrets.GH_DEPLOY_TOKEN }}
+          GITHUB_REPO_SLUG: ${{ github.repository }}
