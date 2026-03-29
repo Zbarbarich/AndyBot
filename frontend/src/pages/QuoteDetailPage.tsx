@@ -88,6 +88,13 @@ const QuoteDetailPage = () => {
     shipping_amount: '0',
   });
   const [lines, setLines] = useState<LineRow[]>([]);
+  /** Per-line quantity as string for input (allows empty during edit); synced on blur. */
+  const [quantityDisplay, setQuantityDisplay] = useState<string[]>([]);
+  /** Per-line unit price as string; synced on blur. */
+  const [unitPriceDisplay, setUnitPriceDisplay] = useState<string[]>([]);
+  const [showCreateConfirm, setShowCreateConfirm] = useState(false);
+  const [showSaveConfirm, setShowSaveConfirm] = useState(false);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
   const fetchCustomers = useCallback(async () => {
     const res = await authFetch(CUSTOMERS_API);
@@ -119,6 +126,8 @@ const QuoteDetailPage = () => {
       if (isNew) {
         setForm({ customer_id: '', ticket_id: '', status: 'open', valid_until: '', notes: '', customer_po_number: '', tax_rate: '0.08', shipping_amount: '0' });
         setLines([emptyLine()]);
+        setQuantityDisplay(['1']);
+        setUnitPriceDisplay(['']);
         setQuote(null);
         setLoading(false);
         return;
@@ -147,7 +156,7 @@ const QuoteDetailPage = () => {
         tax_rate: String(Number(data.tax_rate)),
         shipping_amount: String(Number(data.shipping_amount)),
       });
-      setLines(
+      const newLines: LineRow[] =
         data.lines && data.lines.length > 0
           ? data.lines.map((l: LineRow & { item_sku?: string; item_name?: string; unit_of_measure?: string | null; item_unit_of_measure?: string | null }, i: number) => ({
               id: l.id,
@@ -160,8 +169,10 @@ const QuoteDetailPage = () => {
               unit_of_measure: l.unit_of_measure ?? l.item_unit_of_measure ?? 'EA',
               sort_order: l.sort_order ?? i,
             }))
-          : [emptyLine()]
-      );
+          : [emptyLine()];
+      setLines(newLines);
+      setQuantityDisplay(newLines.map((l) => String(l.quantity)));
+      setUnitPriceDisplay(newLines.map((l) => (Number.isFinite(l.unit_price) ? String(l.unit_price) : '')));
       setLoading(false);
     };
     load();
@@ -177,8 +188,7 @@ const QuoteDetailPage = () => {
     return { subtotal, tax_amount: taxAmount, total };
   }, [lines, form.tax_rate, form.shipping_amount]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const performSubmit = async () => {
     setError('');
     setSaving(true);
     try {
@@ -219,11 +229,90 @@ const QuoteDetailPage = () => {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Failed to update quote');
       setQuote({ ...quote!, ...data });
+      if (data.lines && Array.isArray(data.lines) && data.lines.length > 0) {
+        const newLines: LineRow[] = data.lines.map((l: LineRow & { item_sku?: string; item_name?: string; unit_of_measure?: string | null; item_unit_of_measure?: string | null }, i: number) => ({
+          id: l.id,
+          item_id: l.item_id ?? null,
+          item_sku: l.item_sku,
+          item_name: l.item_name,
+          description: l.description ?? '',
+          quantity: Number(l.quantity),
+          unit_price: Number(l.unit_price),
+          unit_of_measure: l.unit_of_measure ?? l.item_unit_of_measure ?? 'EA',
+          sort_order: l.sort_order ?? i,
+        }));
+        setLines(newLines);
+        setQuantityDisplay(newLines.map((l) => String(l.quantity)));
+        setUnitPriceDisplay(newLines.map((l) => (Number.isFinite(l.unit_price) ? String(l.unit_price) : '')));
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Request failed');
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isNew) {
+      setShowCreateConfirm(true);
+      return;
+    }
+    setShowSaveConfirm(true);
+  };
+
+  const handleConfirmCreate = () => {
+    setShowCreateConfirm(false);
+    performSubmit();
+  };
+
+  const handleConfirmSave = () => {
+    setShowSaveConfirm(false);
+    performSubmit();
+  };
+
+  const handleCancelClick = () => {
+    setShowCancelConfirm(true);
+  };
+
+  const handleConfirmCancel = async () => {
+    setShowCancelConfirm(false);
+    if (isNew) {
+      navigate('/quotes');
+      return;
+    }
+    if (!quote) return;
+    const res = await authFetch(`${QUOTES_API}/${quote.id}`);
+    if (!res.ok) return;
+    const data = await res.json();
+    setQuote(data);
+    setForm({
+      customer_id: String(data.customer_id),
+      ticket_id: data.ticket_id != null ? String(data.ticket_id) : '',
+      status: data.status || 'open',
+      valid_until: data.valid_until ?? '',
+      notes: data.notes ?? '',
+      customer_po_number: data.customer_po_number ?? '',
+      tax_rate: String(Number(data.tax_rate)),
+      shipping_amount: String(Number(data.shipping_amount)),
+    });
+    const newLines: LineRow[] =
+      data.lines && data.lines.length > 0
+        ? data.lines.map((l: LineRow & { item_sku?: string; item_name?: string; unit_of_measure?: string | null; item_unit_of_measure?: string | null }, i: number) => ({
+            id: l.id,
+            item_id: l.item_id ?? null,
+            item_sku: l.item_sku,
+            item_name: l.item_name,
+            description: l.description ?? '',
+            quantity: Number(l.quantity),
+            unit_price: Number(l.unit_price),
+            unit_of_measure: l.unit_of_measure ?? l.item_unit_of_measure ?? 'EA',
+            sort_order: l.sort_order ?? i,
+          }))
+        : [emptyLine()];
+    setLines(newLines);
+    setQuantityDisplay(newLines.map((l) => String(l.quantity)));
+    setUnitPriceDisplay(newLines.map((l) => (Number.isFinite(l.unit_price) ? String(l.unit_price) : '')));
   };
 
   const handleConvertToOrder = async () => {
@@ -245,8 +334,16 @@ const QuoteDetailPage = () => {
     }
   };
 
-  const addLine = () => setLines((prev) => [...prev, emptyLine()]);
-  const removeLine = (index: number) => setLines((prev) => prev.filter((_, i) => i !== index));
+  const addLine = () => {
+    setLines((prev) => [...prev, emptyLine()]);
+    setQuantityDisplay((prev) => [...prev, '1']);
+    setUnitPriceDisplay((prev) => [...prev, '']);
+  };
+  const removeLine = (index: number) => {
+    setLines((prev) => prev.filter((_, i) => i !== index));
+    setQuantityDisplay((prev) => prev.filter((_, i) => i !== index));
+    setUnitPriceDisplay((prev) => prev.filter((_, i) => i !== index));
+  };
   const updateLine = (index: number, field: keyof LineRow, value: number | string | null) => {
     setLines((prev) => {
       const next = [...prev];
@@ -260,6 +357,17 @@ const QuoteDetailPage = () => {
       }
       return next;
     });
+    if (field === 'item_id' && value != null) {
+      const item = items.find((i) => i.id === Number(value));
+      if (item) {
+        setUnitPriceDisplay((prev) => {
+          const next = [...prev];
+          while (next.length <= index) next.push('');
+          next[index] = String(item.unit_price);
+          return next;
+        });
+      }
+    }
   };
 
   const totals = recalcTotals();
@@ -281,9 +389,19 @@ const QuoteDetailPage = () => {
             {isNew ? 'New Quote' : `Quote ${quote?.document_number ?? id}`}
           </h1>
           <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={() => navigate('/quotes')} className="btn-secondary">
+            <button type="button" onClick={() => navigate('/quotes')} className="btn-text-action">
               Back to list
             </button>
+            {!readOnly && (
+              <>
+                <button type="submit" form="quote-form" disabled={saving} className="btn-text-action">
+                  {saving ? 'Saving…' : isNew ? 'Create quote' : 'Save quote'}
+                </button>
+                <button type="button" onClick={handleCancelClick} className="btn-text-action">
+                  Cancel
+                </button>
+              </>
+            )}
             {!isNew && quote && (
               <>
                 <button
@@ -300,7 +418,7 @@ const QuoteDetailPage = () => {
                       setError(e instanceof Error ? e.message : 'Failed to load PDF');
                     }
                   }}
-                  className="btn-secondary"
+                  className="btn-text-action"
                 >
                   View PDF
                 </button>
@@ -321,7 +439,7 @@ const QuoteDetailPage = () => {
                       setError(e instanceof Error ? e.message : 'Failed to download PDF');
                     }
                   }}
-                  className="btn-primary"
+                  className="btn-text-action"
                 >
                   Download PDF
                 </button>
@@ -332,7 +450,7 @@ const QuoteDetailPage = () => {
                 type="button"
                 onClick={handleConvertToOrder}
                 disabled={converting}
-                className="btn-primary"
+                className="btn-text-action"
               >
                 {converting ? 'Converting…' : 'Convert to order'}
               </button>
@@ -346,7 +464,46 @@ const QuoteDetailPage = () => {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+      {showCreateConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-dark-surface border border-dark-border rounded-xl p-6 max-w-md w-full shadow-xl">
+            <h3 className="text-lg font-semibold text-dark-text mb-2">Create quote?</h3>
+            <p className="text-dark-text-muted text-sm mb-4">Are you sure you want to create this quote? This will save and open the new document.</p>
+            <div className="flex gap-2 justify-end">
+              <button type="button" onClick={() => setShowCreateConfirm(false)} className="btn-text-action">Cancel</button>
+              <button type="button" onClick={handleConfirmCreate} className="btn-text-action" disabled={saving}>{saving ? 'Saving…' : 'Create'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showSaveConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-dark-surface border border-dark-border rounded-xl p-6 max-w-md w-full shadow-xl">
+            <h3 className="text-lg font-semibold text-dark-text mb-2">Save changes?</h3>
+            <p className="text-dark-text-muted text-sm mb-4">Are you sure you want to save? This will update the quote.</p>
+            <div className="flex gap-2 justify-end">
+              <button type="button" onClick={() => setShowSaveConfirm(false)} className="btn-text-action">Cancel</button>
+              <button type="button" onClick={handleConfirmSave} className="btn-text-action" disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCancelConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-dark-surface border border-dark-border rounded-xl p-6 max-w-md w-full shadow-xl">
+            <h3 className="text-lg font-semibold text-dark-text mb-2">Discard changes?</h3>
+            <p className="text-dark-text-muted text-sm mb-4">Are you sure you want to discard your changes? This cannot be undone.</p>
+            <div className="flex gap-2 justify-end">
+              <button type="button" onClick={() => setShowCancelConfirm(false)} className="btn-text-action">Keep editing</button>
+              <button type="button" onClick={handleConfirmCancel} className="btn-text-action">Discard</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+        <form id="quote-form" onSubmit={handleSubmit} className="space-y-6">
           <div className="p-4 sm:p-6 rounded-xl bg-dark-surface border border-dark-border space-y-4">
             <h2 className="text-lg font-semibold text-dark-text">Customer &amp; details</h2>
             <div className="detail-grid gap-4">
@@ -470,11 +627,29 @@ const QuoteDetailPage = () => {
                       </td>
                       <td>
                         <input
-                          type="number"
-                          min="0.0001"
-                          step="any"
-                          value={line.quantity}
-                          onChange={(e) => updateLine(idx, 'quantity', parseFloat(e.target.value) || 0)}
+                          type="text"
+                          inputMode="decimal"
+                          value={quantityDisplay[idx] ?? String(line.quantity)}
+                          onChange={(e) => {
+                            setQuantityDisplay((prev) => {
+                              const next = prev.length === lines.length ? [...prev] : lines.map((l) => String(l.quantity));
+                              if (idx >= next.length) return next;
+                              next[idx] = e.target.value;
+                              return next;
+                            });
+                          }}
+                          onBlur={() => {
+                            const raw = quantityDisplay[idx] ?? String(line.quantity);
+                            const parsed = parseFloat(raw);
+                            const num = Number.isFinite(parsed) && parsed >= 0 ? parsed : 1;
+                            updateLine(idx, 'quantity', num);
+                            setQuantityDisplay((prev) => {
+                              const next = [...prev];
+                              while (next.length <= idx) next.push(String(line.quantity));
+                              next[idx] = String(num);
+                              return next;
+                            });
+                          }}
                           className="input-field w-20"
                           disabled={readOnly}
                         />
@@ -493,11 +668,29 @@ const QuoteDetailPage = () => {
                       </td>
                       <td>
                         <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={line.unit_price}
-                          onChange={(e) => updateLine(idx, 'unit_price', parseFloat(e.target.value) || 0)}
+                          type="text"
+                          inputMode="decimal"
+                          value={unitPriceDisplay[idx] ?? String(line.unit_price)}
+                          onChange={(e) => {
+                            setUnitPriceDisplay((prev) => {
+                              const next = [...prev];
+                              while (next.length <= idx) next.push(String(lines[idx]?.unit_price ?? ''));
+                              next[idx] = e.target.value;
+                              return next;
+                            });
+                          }}
+                          onBlur={() => {
+                            const raw = (unitPriceDisplay[idx] ?? String(line.unit_price)).trim();
+                            const parsed = parseFloat(raw);
+                            const num = Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+                            updateLine(idx, 'unit_price', num);
+                            setUnitPriceDisplay((prev) => {
+                              const next = [...prev];
+                              while (next.length <= idx) next.push(String(line.unit_price));
+                              next[idx] = String(num);
+                              return next;
+                            });
+                          }}
                           className="input-field w-24"
                           disabled={readOnly}
                         />
@@ -505,7 +698,7 @@ const QuoteDetailPage = () => {
                       <td className="whitespace-nowrap">{(line.quantity * line.unit_price).toFixed(2)}</td>
                       {!readOnly && (
                         <td>
-                          <button type="button" onClick={() => removeLine(idx)} className="btn-secondary text-sm text-red-400">
+                          <button type="button" onClick={() => removeLine(idx)} className="btn-text-action text-sm text-red-400">
                             Remove
                           </button>
                         </td>
@@ -516,7 +709,7 @@ const QuoteDetailPage = () => {
               </table>
             </div>
             {!readOnly && (
-              <button type="button" onClick={addLine} className="btn-secondary mt-2">
+              <button type="button" onClick={addLine} className="btn-text-action mt-2">
                 Add line
               </button>
             )}
@@ -557,17 +750,6 @@ const QuoteDetailPage = () => {
               <p className="font-semibold text-lg">Total: {totals.total.toFixed(2)}</p>
             </div>
           </div>
-
-          {!readOnly && (
-            <div className="flex flex-wrap gap-2">
-              <button type="submit" disabled={saving} className="btn-primary">
-                {saving ? 'Saving…' : isNew ? 'Create quote' : 'Save quote'}
-              </button>
-              <button type="button" onClick={() => navigate('/quotes')} className="btn-secondary">
-                Cancel
-              </button>
-            </div>
-          )}
         </form>
     </div>
   );

@@ -39,7 +39,8 @@ app.use(
   })
 );
 
-app.use(express.json());
+// Allow larger payloads for ticket image/attachment uploads (base64 in JSON)
+app.use(express.json({ limit: "10mb" }));
 app.use("/", gatewayRoutes);
 
 // Error handling middleware

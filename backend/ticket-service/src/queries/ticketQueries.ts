@@ -121,12 +121,12 @@ const ticketQueries = {
     LIMIT 20
   `,
 
-  getImages: `SELECT id, ticket_id, position, created_at FROM ticket_images WHERE ticket_id = $1 ORDER BY position`,
-  getImageData: `SELECT image_data FROM ticket_images WHERE id = $1 AND ticket_id = $2`,
+  getImages: `SELECT id, ticket_id, position, created_at, mime_type, original_filename FROM ticket_images WHERE ticket_id = $1 ORDER BY position`,
+  getImageData: `SELECT image_data, mime_type, original_filename FROM ticket_images WHERE id = $1 AND ticket_id = $2`,
   insertImage: `
-    INSERT INTO ticket_images (ticket_id, position, image_data)
-    VALUES ($1, $2, $3)
-    RETURNING id, ticket_id, position, created_at
+    INSERT INTO ticket_images (ticket_id, position, image_data, mime_type, original_filename)
+    VALUES ($1, $2, $3, $4, $5)
+    RETURNING id, ticket_id, position, created_at, mime_type, original_filename
   `,
   deleteImage: `DELETE FROM ticket_images WHERE id = $1 AND ticket_id = $2 RETURNING id`,
   countImages: `SELECT COUNT(*) AS count FROM ticket_images WHERE ticket_id = $1`,

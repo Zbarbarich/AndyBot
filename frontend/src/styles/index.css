@@ -46,6 +46,13 @@
            font-medium cursor-pointer inline-flex items-center gap-1 transition-colors;
   }
 
+  /* Text-only action buttons (no borders/background); match order/invoice/PO style. */
+  .btn-text-action {
+    @apply text-primary hover:text-primary-hover hover:underline bg-transparent border-0
+           font-medium cursor-pointer inline-flex items-center justify-center gap-1 transition-colors
+           disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] px-2 py-1;
+  }
+
   .input-field {
     @apply w-full px-4 py-3 rounded-lg border border-dark-border min-h-[44px]
            bg-dark-bg text-dark-text placeholder-dark-text-muted text-base

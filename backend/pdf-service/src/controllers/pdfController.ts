@@ -225,12 +225,12 @@ export const pdfController = {
       }
       const doc = docResult.rows[0];
       const linesResult = await query(purchaseOrderQueries.getLinesByPoId, [id]);
-      const lines = linesResult.rows.map((r: { description: string | null; quantity: string; unit_cost: string; item_sku?: string; item_name?: string }) => ({
+      const lines = linesResult.rows.map((r: { description: string | null; quantity: string; unit_cost: string; sku?: string | null; item_name?: string | null }) => ({
         description: r.description,
         quantity: Number(r.quantity),
         unit_cost: Number(r.unit_cost),
-        item_sku: r.item_sku,
-        item_name: r.item_name,
+        item_sku: r.sku ?? null,
+        item_name: r.item_name ?? null,
       }));
       const data: POData = {
         po_number: doc.po_number,

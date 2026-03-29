@@ -22,7 +22,7 @@ theNineteenthChamber/
 │   ├── order-service/           # Orders, quotes, items (port 3005)
 │   ├── invoice-service/         # Invoices (port 3006)
 │   ├── pdf-service/             # PDF generation (port 3007)
-│   ├── shared/                  # Shared SQL schema (migrations 000-019; see shared/schema/README.md)
+│   ├── shared/                  # Shared SQL schema (migrations 000-021; see shared/schema/README.md)
 │   └── scripts/
 │       └── setup-env.sh         # Copy env to app services and set ports
 └── package.json                # Root scripts (install-all, start)
@@ -39,7 +39,7 @@ For **development mode** (see below) you use the hosted database via an SSH tunn
 
 ## Development mode (recommended: local app + hosted DB via SSH tunnel)
 
-This is the setup for day-to-day development: run the frontend and backend on your machine while connecting to the **same PostgreSQL database** used by the hosted app. No Docker and no local Postgres needed. All local env files are gitignored; production and CI/CD are unchanged.
+The application is cloud-hosted on Oracle Cloud, with PostgreSQL running there. This setup lets you run the frontend and backend locally while connecting to the **same PostgreSQL database** used by the hosted app (via an SSH tunnel). No Docker and no local Postgres needed. All local env files are gitignored; production and CI/CD are unchanged.
 
 ### One-time setup
 
@@ -56,8 +56,8 @@ This is the setup for day-to-day development: run the frontend and backend on yo
    ```
 
 3. **Edit `backend/auth-service/.env`** for the tunnel setup. The app expects **`DB_*`** variable names (not `POSTGRES_*`). Use exactly:
-   - **DB_HOST=localhost** — required when using the SSH tunnel (tunnel forwards localhost:5432 to the server).
-   - **DB_PORT=5432**
+   - **DB_HOST=localhost** — required when using the SSH tunnel (tunnel forwards a local port to the server’s Postgres).
+   - **DB_PORT=5432** — or **5433** (or another free port) if local PostgreSQL already uses 5432; the SSH `-L` local port must match `DB_PORT` (e.g. `-L 5433:127.0.0.1:5432`).
    - **DB_NAME=the_nineteenth_chamber** — must match the hosted app’s database name (lowercase, underscores).
    - **DB_USER** and **DB_PASSWORD** — same as on the server (e.g. from the deploy env or from `docker exec deploy-postgres-1 env | grep POSTGRES_` on the server; the role name is often the value of `POSTGRES_USER`).
    - **DB_SSL=false** — the Postgres container on the server does not use SSL; the tunnel is already encrypted.
@@ -121,7 +121,8 @@ If you have **local PostgreSQL** installed and it is using port 5432, either sto
 ### Preparing for commit
 
 - **Do not commit** `.env` or `deploy/.env` — they are listed in `.gitignore`. They contain secrets and local/remote DB settings.
-- **Safe to commit:** code changes, `.env.example` files, README, `setup-env.sh`, and other non-secret config. Run `git status` before committing to confirm no `.env` files are staged.
+- **Safe to commit:** code changes, `.env.example` files, README, `setup-env.sh`, `backend/shared/schema/*.sql`, and migration runner scripts under `backend/scripts/` (no secrets). Run `git status` before committing to confirm no `.env` files are staged.
+- **Deploy:** After pulling, apply new SQL migrations on each environment before relying on new columns (e.g. **020** / **021** — see Database Schema below). CI/CD should run migrations or document a manual `psql` / `node ../scripts/run-migration-0xx.js` step against production.
 
 ## Development (other)
 
@@ -161,13 +162,22 @@ When running locally:
 
 **App (JWT required; gateway proxies to the appropriate service):**
 - Customers, tickets, orders, quotes, invoices, items, purchase orders, and PDFs are exposed under `/api/app/*`. The gateway proxies requests to customer-service, ticket-service, order-service, invoice-service, or pdf-service by path.
-- **Purchase orders:** `GET /api/app/purchase-orders`, `GET /api/app/purchase-orders/:id`, `GET /api/app/purchase-orders/:id/pdf` (proxied to order-service and pdf-service).
+- **Purchase orders:** `GET /api/app/purchase-orders`, `GET /api/app/purchase-orders/:id`, `PATCH /api/app/purchase-orders/:id/close`, `PATCH /api/app/purchase-orders/:id/cancel` (open POs only), `GET /api/app/purchase-orders/:id/pdf` (proxied to order-service and pdf-service).
 - **Global search:** `GET /api/app/search?q=<term>` returns aggregated results from customers, tickets, orders, invoices, items, and purchase orders: `{ customers, tickets, orders, invoices, items, purchase_orders }`.
 - **Customer payment history:** `GET /api/app/customers/:id/payment-history` returns all invoice payments and order deposits for that customer. Payments can be reversed via `DELETE /api/app/invoices/:id/payments/:paymentId` (invoice payments) or `DELETE /api/app/orders/:orderId/deposits/:depositId` (unapplied deposits only).
 
 ## Database Schema
 
-The same PostgreSQL database is used by auth-service and all app services. Schema is in `backend/shared/schema/`; run migrations 000-019 in order. See `backend/shared/schema/README.md` for table/FK reference, timezone, and timestamp discipline.
+The same PostgreSQL database is used by auth-service and all app services. Schema is in `backend/shared/schema/`; run migrations in numeric order. See `backend/shared/schema/README.md` for table/FK reference, timezone, and timestamp discipline.
+
+**Migrations 020–021 (purchase order lines & ticket attachments):**
+
+- **020** (`020_purchase_order_line_notes_received.sql`) — adds `purchase_order_lines.ordered_via_notes` and `received_at` (notes/URL when ordering Online or Other; mark received).
+- **021** (`021_ticket_attachments_extend.sql`) — adds `ticket_images.mime_type` and `original_filename`, widens attachment position limit to 1–10.
+
+Run on each environment after deploy using the SQL files or `backend/scripts/run-migration-020.js` / `run-migration-021.js` (from `order-service` / `ticket-service` with `NODE_PATH=./node_modules`, same as other migration scripts). Without these, PO detail and ticket attachment APIs can return 500 (missing columns).
+
+**API gateway:** JSON body size limit is increased (e.g. 10MB) so ticket attachment uploads (base64 in JSON) are accepted; ticket-service already uses a matching limit.
 
 **Users table (auth):**
 - `userID` (SERIAL PRIMARY KEY)
@@ -188,6 +198,14 @@ The frontend is a single-page application with protected routes. Login persists 
 **Routes:** `/` (The Yard), `/customers`, `/customers/new`, `/customers/:id`, `/customers/:id/payment-history`, `/tickets`, `/tickets/new`, `/tickets/:id`, `/tickets/:id/edit`, `/orders`, `/orders/:id`, `/orders/:id/billing`, `/invoices`, `/invoices/bill-order`, `/invoices/:id`, `/purchasing`, `/purchasing/:id`, `/items`, `/items/new`, `/items/:id`, `/items/:id/edit`, `/admin`, `/admin/users/new`. Quotes redirect to orders.
 
 **Pages:** Landing, Customers, Customer form/detail, Customer payment history (with reverse payment), Tickets, Ticket form/detail/edit, Orders (and quotes), Order/Quote detail (deposits, POs), Billing (per order), Invoices, Bill order, Invoice detail, Purchasing, Purchase order detail, Items (list/form/detail/edit), Admin (users, create user).
+
+**Orders & quotes:** Line quantity and unit price use text inputs while typing and commit on blur (so you can clear the field and type a new value). On an existing **order**, the default view is “Current order (remaining to bill)” — quantity shows **remaining** only while **read-only**; click **Edit** in the header to change full line quantities and prices. **Save** / **Cancel** live in the header next to the back control (not duplicated in the order summary). Saving validates that no line’s quantity is below what is already invoiced.
+
+**Order detail & purchase orders (same line on multiple POs):** For **orders** only, `GET` and `PUT /api/app/orders/:id` attach **`on_purchase_orders`** to each line (non-cancelled POs that reference that line: id, `po_number`, status). The order screen shows a single-line note under the description, **On purchase order** with a link to each PO. **Create PO** pre-selects only lines not already on an open/closed PO; lines already on a PO appear in the modal with checkboxes disabled. **Cancelled** POs are omitted from `on_purchase_orders` and from the duplicate-line check when creating a PO, so those lines can be added to a new PO after **Cancel PO** on the purchase order detail page. **PDF and invoice output are unchanged** (pdf-service still loads raw order lines without this enrichment).
+
+**Purchase orders:** Detail shows customer contact fields; lines support ordered-via (including Online and Other with notes), mark received, **Cancel PO** (open POs only; frees linked order lines for a new PO), and **Close PO** when all lines are received. Open PO lines that are not yet received are excluded from billable lines when creating invoices (invoice-service). PO detail includes **View PDF** and **Download PDF**.
+
+**Tickets:** Attachments support images and other files; non-image types use file-type silhouettes. HEIC/HEIF is converted in the browser for preview (`heic2any`). Large uploads require the gateway JSON limit above.
 
 **Billing:** Bill order flow (`/invoices/bill-order`) creates an invoice from an order; order billing page at `/orders/:id/billing`.
 

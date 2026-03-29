@@ -3,7 +3,7 @@ import { query } from '../config/db';
 import ticketQueries from '../queries/ticketQueries';
 import { AppRequest } from '../middleware/userContext';
 
-const MAX_IMAGES = 5;
+const MAX_IMAGES = 10;
 const MIN_PRIORITY = 1;
 const MAX_PRIORITY = 5;
 const VALID_STATUSES = ['Open', 'Pending Closure Review', 'Closed'] as const;
@@ -285,7 +285,7 @@ export const ticketController = {
       const countResult = await query(ticketQueries.countImages, [ticketId]);
       const count = parseInt(countResult.rows[0]?.count ?? '0', 10);
       if (count >= MAX_IMAGES) {
-        res.status(400).json({ error: `Maximum ${MAX_IMAGES} images per ticket` });
+        res.status(400).json({ error: `Maximum ${MAX_IMAGES} attachments per ticket` });
         return;
       }
       const position = count + 1;
@@ -297,14 +297,22 @@ export const ticketController = {
       } else if (typeof req.body === 'string') {
         imageData = Buffer.from(req.body, 'base64');
       } else {
-        res.status(400).json({ error: 'Image data required (buffer or base64)' });
+        res.status(400).json({ error: 'Attachment data required (buffer or base64)' });
         return;
       }
-      const result = await query(ticketQueries.insertImage, [ticketId, position, imageData]);
+      const mimeType = (req.body?.mime_type != null ? String(req.body.mime_type) : null) || 'application/octet-stream';
+      const originalFilename = req.body?.original_filename != null ? String(req.body.original_filename).slice(0, 500) : null;
+      const result = await query(ticketQueries.insertImage, [
+        ticketId,
+        position,
+        imageData,
+        mimeType.slice(0, 255),
+        originalFilename,
+      ]);
       res.status(201).json(result.rows[0]);
     } catch (e) {
       console.error('ticketController.addImage', e);
-      res.status(500).json({ error: 'Failed to add image' });
+      res.status(500).json({ error: 'Failed to add attachment' });
     }
   },
 
@@ -338,19 +346,24 @@ export const ticketController = {
       }
       const result = await query(ticketQueries.getImageData, [imageId, ticketId]);
       if (result.rows.length === 0) {
-        res.status(404).json({ error: 'Image not found' });
+        res.status(404).json({ error: 'Attachment not found' });
         return;
       }
-      const buf = result.rows[0].image_data;
+      const row = result.rows[0] as { image_data: unknown; mime_type?: string | null; original_filename?: string | null };
+      const buf = row.image_data;
       if (Buffer.isBuffer(buf)) {
-        res.set('Content-Type', 'image/png');
+        const mimeType = row.mime_type || 'image/png';
+        res.set('Content-Type', mimeType);
+        if (row.original_filename) {
+          res.set('Content-Disposition', `inline; filename="${String(row.original_filename).replace(/"/g, '\\"')}"`);
+        }
         res.send(buf);
       } else {
-        res.status(404).json({ error: 'Image not found' });
+        res.status(404).json({ error: 'Attachment not found' });
       }
     } catch (e) {
       console.error('ticketController.getImage', e);
-      res.status(500).json({ error: 'Failed to get image' });
+      res.status(500).json({ error: 'Failed to get attachment' });
     }
   },
 };

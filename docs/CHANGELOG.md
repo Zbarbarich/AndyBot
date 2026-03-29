@@ -4,6 +4,22 @@ Notable behavior and feature changes for A.N.D.Y. (Advanced Notation & Deploymen
 
 ---
 
+## Purchase order line visibility on orders & cancel PO
+
+### Behavior
+
+- **Order API:** `GET` and `PUT` order responses enrich each order line with **`on_purchase_orders`**: non-cancelled purchase orders that include that line (`purchase_order_id`, `po_number`, `purchase_order_status`). Cancelled POs are excluded.
+- **Duplicate line on PO:** Creating a PO from an order still allows each order line on at most one *active* PO; lines tied only to **cancelled** POs can be selected again.
+- **Cancel PO:** `PATCH /api/app/purchase-orders/:id/cancel` sets an **open** PO to `cancelled`. Purchase order detail includes a **Cancel PO** action (with confirmation).
+- **Order detail UI:** Under each line’s description, a single-line **On purchase order** note (with links) uses `whitespace-nowrap` so table rows stay compact. **Create PO** only pre-checks eligible lines; lines already on a PO stay visible with disabled checkboxes.
+- **PDFs / invoices:** No change. pdf-service continues to use plain line queries; PO notes do not appear on PDF output.
+
+### Frontend typing
+
+- **QuoteDetailPage** and **OrderDetailPage** annotate mapped line arrays as `LineRow[]` where a ternary previously widened types and broke strict `tsc`.
+
+---
+
 ## Orders, Invoicing, Payment Reversal & Unit of Measure
 
 ### Order closing
