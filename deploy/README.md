@@ -107,6 +107,8 @@ Edit `deploy/Caddyfile` and replace `yourdomain.com` with your domain. Caddy wil
 
 See [docs/DEPLOYMENT_ORACLE_CI_ACCESS.md](../docs/DEPLOYMENT_ORACLE_CI_ACCESS.md) for CI/CD setup (secrets `SSH_HOST`, `SSH_USER`, `SSH_PRIVATE_KEY`, optional `DEPLOY_PATH`). Production `.env` stays on the server in `deploy/.env`; do not put it in GitHub.
 
+**Test deploy without merging to `main`:** GitHub → **Actions** → **Deploy to VPS** → **Run workflow**. Pick the workflow definition branch, set **Branch to deploy on VPS** to the ref the server should run (must exist on `origin`). Pushes only auto-deploy from **`main`**; manual runs can deploy any branch.
+
 ### Live site still shows old UI after a “successful” deploy
 
 **Cause A — Git on the VPS cannot pull from GitHub.** If `git remote` uses HTTPS and the server has no valid credential, `git fetch` fails with `Authentication failed for 'https://github.com/...'`. With `set -e` in the deploy script, that should **fail the GitHub Actions job** before any Docker build. If you ever see that error in a run that still went on to build images, treat the log with care (mixed runs or an old server-side script). After fixing Git, confirm a green deploy log includes **“Building from commit”** and that the hash matches **main** on GitHub.

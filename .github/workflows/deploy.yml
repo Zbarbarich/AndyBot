@@ -1,5 +1,6 @@
 # Deploy to Oracle (or other) VPS on push to main.
 # Build runs on the VPS to avoid a container registry.
+# Manual test: Actions → Deploy to VPS → Run workflow → pick branch + "Branch to deploy on VPS".
 # Required secrets: SSH_HOST, SSH_USER, SSH_PRIVATE_KEY
 # Optional: DEPLOY_PATH (absolute path on VPS, e.g. /home/opc/theNineteenthChamber)
 
@@ -8,6 +9,13 @@ name: Deploy to VPS
 on:
   push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      deploy_ref:
+        description: Branch (or tag) on GitHub to deploy on the VPS — must exist on origin
+        required: true
+        default: main
+        type: string
 
 jobs:
   deploy:
@@ -47,9 +55,9 @@ jobs:
             else
               cd ~/theNineteenthChamber
             fi
-            echo "Updating repo from origin/main..."
+            echo "Deploying origin/${DEPLOY_GIT_REF} on VPS..."
             git fetch origin
-            git reset --hard origin/main
+            git reset --hard "origin/${DEPLOY_GIT_REF}"
             echo "Building from commit:"
             git log -1 --oneline
             git rev-parse HEAD
@@ -59,3 +67,4 @@ jobs:
             ./deploy/prune-docker.sh
         env:
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          DEPLOY_GIT_REF: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_ref || github.ref_name }}
