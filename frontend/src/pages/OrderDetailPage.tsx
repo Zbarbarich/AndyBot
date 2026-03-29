@@ -145,8 +145,14 @@ const OrderDetailPage = () => {
   });
   const [createPurchaseOrder, setCreatePurchaseOrder] = useState(false);
   const [lines, setLines] = useState<LineRow[]>([]);
+  /** Per-line quantity as string for input (allows empty during edit); synced on blur. */
+  const [quantityDisplay, setQuantityDisplay] = useState<string[]>([]);
+  /** Per-line unit price as string (allows clearing while typing); synced on blur. */
+  const [unitPriceDisplay, setUnitPriceDisplay] = useState<string[]>([]);
   const [isReadOnly, setIsReadOnly] = useState(true);
   const [showSaveConfirm, setShowSaveConfirm] = useState(false);
+  const [showCreateConfirm, setShowCreateConfirm] = useState(false);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
   const fetchCustomers = useCallback(async () => {
     const res = await authFetch(CUSTOMERS_API);
@@ -191,6 +197,8 @@ const OrderDetailPage = () => {
         });
         setCreatePurchaseOrder(false);
         setLines([emptyLine()]);
+        setQuantityDisplay(['1']);
+        setUnitPriceDisplay(['']);
         setOrder(null);
         setLoading(false);
         return;
@@ -221,7 +229,7 @@ const OrderDetailPage = () => {
         tax_rate: String(Number(data.tax_rate)),
         shipping_amount: String(Number(data.shipping_amount)),
       });
-      setLines(
+      const newLines =
         data.lines && data.lines.length > 0
           ? data.lines.map((l: LineRow & { item_sku?: string; item_name?: string; unit_of_measure?: string | null; item_unit_of_measure?: string | null; quantity_billed?: number; invoiced_on?: InvoicedOnRow[] }, i: number) => ({
               id: l.id,
@@ -239,8 +247,10 @@ const OrderDetailPage = () => {
               include_in_po: false,
               po_unit_cost: undefined,
             }))
-          : [emptyLine()]
-      );
+          : [emptyLine()];
+      setLines(newLines);
+      setQuantityDisplay(newLines.map((l) => String(l.quantity)));
+      setUnitPriceDisplay(newLines.map((l) => (Number.isFinite(l.unit_price) ? String(l.unit_price) : '')));
       setSelectedSubOrderView('current');
       setSubOrderInvoice(null);
       setLoading(false);
@@ -318,6 +328,15 @@ const OrderDetailPage = () => {
 
   const performSubmit = async () => {
     setError('');
+    if (!isNew && order && order.type === 'order') {
+      for (const l of lines) {
+        const billed = Number(l.quantity_billed ?? 0);
+        if (l.id != null && billed > 0 && Number(l.quantity) < billed) {
+          setError(`A line has quantity below what is already invoiced (${billed}). Increase quantity or adjust billing first.`);
+          return;
+        }
+      }
+    }
     setSaving(true);
     try {
       const body = {
@@ -389,7 +408,7 @@ const OrderDetailPage = () => {
       if (!res.ok) throw new Error(data.error || 'Failed to update document');
       setOrder({ ...order!, ...data });
       if (data.lines && data.lines.length > 0) {
-        setLines(data.lines.map((l: LineRow & { item_sku?: string; item_name?: string; unit_of_measure?: string | null; item_unit_of_measure?: string | null }, i: number) => ({
+        const newLines = data.lines.map((l: LineRow & { item_sku?: string; item_name?: string; unit_of_measure?: string | null; item_unit_of_measure?: string | null; quantity_billed?: number; invoiced_on?: InvoicedOnRow[] }, i: number) => ({
           id: l.id,
           item_id: l.item_id ?? null,
           item_sku: l.item_sku,
@@ -400,9 +419,14 @@ const OrderDetailPage = () => {
           unit_of_measure: l.unit_of_measure ?? l.item_unit_of_measure ?? 'EA',
           sort_order: l.sort_order ?? i,
           billing_status: (l.billing_status || 'pending') as BillingStatus,
+          quantity_billed: l.quantity_billed != null ? Number(l.quantity_billed) : undefined,
+          invoiced_on: l.invoiced_on ?? undefined,
           include_in_po: false,
           po_unit_cost: undefined,
-        })));
+        }));
+        setLines(newLines);
+        setQuantityDisplay(newLines.map((l) => String(l.quantity)));
+        setUnitPriceDisplay(newLines.map((l) => (Number.isFinite(l.unit_price) ? String(l.unit_price) : '')));
       }
       setIsReadOnly(true);
     } catch (e) {
@@ -414,12 +438,22 @@ const OrderDetailPage = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isNew && order && !showSaveConfirm) {
+    if (isNew) {
+      setShowCreateConfirm(true);
+      return;
+    }
+    if (order && !showSaveConfirm) {
       setShowSaveConfirm(true);
       return;
     }
-    performSubmit();
+    setShowCreateConfirm(false);
     setShowSaveConfirm(false);
+    performSubmit();
+  };
+
+  const handleConfirmCreate = () => {
+    setShowCreateConfirm(false);
+    performSubmit();
   };
 
   const handleConfirmSave = () => {
@@ -427,8 +461,67 @@ const OrderDetailPage = () => {
     performSubmit();
   };
 
-  const addLine = () => setLines((prev) => [...prev, emptyLine()]);
-  const removeLine = (index: number) => setLines((prev) => prev.filter((_, i) => i !== index));
+  const handleCancelClick = () => {
+    setShowCancelConfirm(true);
+  };
+
+  const handleConfirmCancel = async () => {
+    setShowCancelConfirm(false);
+    if (isNew) {
+      navigate('/orders');
+      return;
+    }
+    if (!order) return;
+    const data = await fetchOrder(order.id);
+    if (!data) return;
+    setOrder(data);
+    setForm({
+      docType: (data.type === 'quote' || data.type === 'return' ? data.type : 'order') as 'quote' | 'order' | 'return',
+      customer_id: String(data.customer_id),
+      ticket_id: data.ticket_id != null ? String(data.ticket_id) : '',
+      status: data.status || 'open',
+      valid_until: data.valid_until ?? '',
+      order_date: data.order_date ?? new Date().toISOString().slice(0, 10),
+      notes: data.notes ?? '',
+      customer_po_number: data.customer_po_number ?? '',
+      tax_rate: String(Number(data.tax_rate)),
+      shipping_amount: String(Number(data.shipping_amount)),
+    });
+    const newLines =
+      data.lines && data.lines.length > 0
+        ? data.lines.map((l: LineRow & { item_sku?: string; item_name?: string; unit_of_measure?: string | null; item_unit_of_measure?: string | null; quantity_billed?: number; invoiced_on?: InvoicedOnRow[] }, i: number) => ({
+            id: l.id,
+            item_id: l.item_id ?? null,
+            item_sku: l.item_sku,
+            item_name: l.item_name,
+            description: l.description ?? '',
+            quantity: Number(l.quantity),
+            unit_price: Number(l.unit_price),
+            unit_of_measure: l.unit_of_measure ?? l.item_unit_of_measure ?? 'EA',
+            sort_order: l.sort_order ?? i,
+            billing_status: (l.billing_status || 'pending') as BillingStatus,
+            quantity_billed: l.quantity_billed != null ? Number(l.quantity_billed) : undefined,
+            invoiced_on: l.invoiced_on ?? undefined,
+            include_in_po: false,
+            po_unit_cost: undefined,
+          }))
+        : [emptyLine()];
+    setLines(newLines);
+    setQuantityDisplay(newLines.map((l) => String(l.quantity)));
+    setUnitPriceDisplay(newLines.map((l) => (Number.isFinite(l.unit_price) ? String(l.unit_price) : '')));
+    setIsReadOnly(true);
+  };
+
+  const addLine = () => {
+    setLines((prev) => [...prev, emptyLine()]);
+    setQuantityDisplay((prev) => [...prev, '1']);
+    setUnitPriceDisplay((prev) => [...prev, '']);
+  };
+  const removeLine = (index: number) => {
+    setLines((prev) => prev.filter((_, i) => i !== index));
+    setQuantityDisplay((prev) => prev.filter((_, i) => i !== index));
+    setUnitPriceDisplay((prev) => prev.filter((_, i) => i !== index));
+  };
   const updateLine = (index: number, field: keyof LineRow, value: number | string | boolean | null) => {
     setLines((prev) => {
       const next = [...prev];
@@ -443,6 +536,17 @@ const OrderDetailPage = () => {
       }
       return next;
     });
+    if (field === 'item_id' && value != null) {
+      const item = items.find((i) => i.id === Number(value));
+      if (item) {
+        setUnitPriceDisplay((prev) => {
+          const next = [...prev];
+          while (next.length <= index) next.push('');
+          next[index] = String(item.unit_price);
+          return next;
+        });
+      }
+    }
   };
 
   const hasRemaining = (l: LineRow) => {
@@ -550,6 +654,24 @@ const OrderDetailPage = () => {
             </label>
           </div>
         )}
+        {!isNew && order && (
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+            {readOnly ? (
+              <button type="button" onClick={() => setIsReadOnly(false)} className="link-primary">
+                Edit
+              </button>
+            ) : (
+              <>
+                <button type="submit" form="order-detail-form" disabled={saving} className="link-primary">
+                  {saving ? 'Saving…' : 'Save'}
+                </button>
+                <button type="button" onClick={handleCancelClick} className="link-primary">
+                  Cancel
+                </button>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {showSaveConfirm && (
@@ -558,8 +680,34 @@ const OrderDetailPage = () => {
             <h3 className="text-lg font-semibold text-dark-text mb-2">Save changes?</h3>
             <p className="text-dark-text-muted text-sm mb-4">Are you sure you want to save? This will update the order.</p>
             <div className="flex gap-2 justify-end">
-              <button type="button" onClick={() => setShowSaveConfirm(false)} className="btn-secondary">Cancel</button>
-              <button type="button" onClick={handleConfirmSave} className="btn-primary" disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
+              <button type="button" onClick={() => setShowSaveConfirm(false)} className="btn-text-action">Cancel</button>
+              <button type="button" onClick={handleConfirmSave} className="btn-text-action" disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCreateConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-dark-surface border border-dark-border rounded-xl p-6 max-w-md w-full shadow-xl">
+            <h3 className="text-lg font-semibold text-dark-text mb-2">{form.docType === 'quote' ? 'Create quote?' : 'Create order?'}</h3>
+            <p className="text-dark-text-muted text-sm mb-4">Are you sure you want to create this {form.docType === 'quote' ? 'quote' : 'order'}? This will save and open the new document.</p>
+            <div className="flex gap-2 justify-end">
+              <button type="button" onClick={() => setShowCreateConfirm(false)} className="btn-text-action">Cancel</button>
+              <button type="button" onClick={handleConfirmCreate} className="btn-text-action" disabled={saving}>{saving ? 'Saving…' : 'Create'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCancelConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-dark-surface border border-dark-border rounded-xl p-6 max-w-md w-full shadow-xl">
+            <h3 className="text-lg font-semibold text-dark-text mb-2">Discard changes?</h3>
+            <p className="text-dark-text-muted text-sm mb-4">Are you sure you want to discard your changes? This cannot be undone.</p>
+            <div className="flex gap-2 justify-end">
+              <button type="button" onClick={() => setShowCancelConfirm(false)} className="btn-text-action">Keep editing</button>
+              <button type="button" onClick={handleConfirmCancel} className="btn-text-action">Discard</button>
             </div>
           </div>
         </div>
@@ -567,7 +715,7 @@ const OrderDetailPage = () => {
 
       <ErrorBanner message={error} />
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form id="order-detail-form" onSubmit={handleSubmit} className="space-y-6">
         {/* Customer & details: full width (busy component) */}
         <div className="p-4 sm:p-6 rounded-xl bg-dark-surface border border-dark-border space-y-4">
           <h2 className="text-lg font-semibold text-dark-text">Customer &amp; details</h2>
@@ -757,15 +905,33 @@ const OrderDetailPage = () => {
                         ) : null}
                       </td>
                       <td className="py-1.5 px-2 text-right align-top">
-                        {isCurrentOrderRemainingView ? (
+                        {readOnly && isCurrentOrderRemainingView ? (
                           <span className="font-mono">{remainingQty}</span>
                         ) : (
                           <input
-                            type="number"
-                            min="0.0001"
-                            step="any"
-                            value={line.quantity}
-                            onChange={(e) => updateLine(idx, 'quantity', parseFloat(e.target.value) || 0)}
+                            type="text"
+                            inputMode="decimal"
+                            value={quantityDisplay[idx] ?? String(line.quantity)}
+                            onChange={(e) => {
+                              setQuantityDisplay((prev) => {
+                                const next = [...prev];
+                                while (next.length <= idx) next.push(String(lines[idx]?.quantity ?? 1));
+                                next[idx] = e.target.value;
+                                return next;
+                              });
+                            }}
+                            onBlur={() => {
+                              const raw = quantityDisplay[idx] ?? String(line.quantity);
+                              const parsed = parseFloat(raw);
+                              const num = Number.isFinite(parsed) && parsed >= 0 ? parsed : 1;
+                              updateLine(idx, 'quantity', num);
+                              setQuantityDisplay((prev) => {
+                                const next = [...prev];
+                                while (next.length <= idx) next.push(String(line.quantity));
+                                next[idx] = String(num);
+                                return next;
+                              });
+                            }}
                             className="input-field py-1.5 px-2 text-sm min-h-0 w-16 text-right"
                             disabled={readOnly}
                           />
@@ -785,11 +951,29 @@ const OrderDetailPage = () => {
                       </td>
                       <td className="py-1.5 px-2 text-right align-top">
                         <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={line.unit_price}
-                          onChange={(e) => updateLine(idx, 'unit_price', parseFloat(e.target.value) || 0)}
+                          type="text"
+                          inputMode="decimal"
+                          value={unitPriceDisplay[idx] ?? String(line.unit_price)}
+                          onChange={(e) => {
+                            setUnitPriceDisplay((prev) => {
+                              const next = [...prev];
+                              while (next.length <= idx) next.push(String(lines[idx]?.unit_price ?? ''));
+                              next[idx] = e.target.value;
+                              return next;
+                            });
+                          }}
+                          onBlur={() => {
+                            const raw = (unitPriceDisplay[idx] ?? String(line.unit_price)).trim();
+                            const parsed = parseFloat(raw);
+                            const num = Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+                            updateLine(idx, 'unit_price', num);
+                            setUnitPriceDisplay((prev) => {
+                              const next = [...prev];
+                              while (next.length <= idx) next.push(String(line.unit_price));
+                              next[idx] = String(num);
+                              return next;
+                            });
+                          }}
                           className="input-field py-1.5 px-2 text-sm min-h-0 w-24 text-right"
                           disabled={readOnly}
                         />
@@ -835,7 +1019,7 @@ const OrderDetailPage = () => {
               </table>
             </div>
             {!readOnly && (
-              <button type="button" onClick={addLine} className="btn-secondary mt-2">
+              <button type="button" onClick={addLine} className="btn-text-action mt-2">
                 Add line
               </button>
             )}
@@ -892,11 +1076,6 @@ const OrderDetailPage = () => {
                   </div>
                 )}
                 <div className="flex flex-wrap gap-x-4 gap-y-1 pt-1">
-                  {readOnly ? (
-                    <button type="button" onClick={() => setIsReadOnly(false)} className="link-primary">Edit</button>
-                  ) : (
-                    <button type="button" onClick={() => setIsReadOnly(true)} className="link-primary">Done editing</button>
-                  )}
                   <button type="button" onClick={viewPdf} className="link-primary">View PDF</button>
                   <button type="button" onClick={downloadPdf} className="link-primary">Download PDF</button>
                   {order.original_quote_id != null && (
@@ -990,7 +1169,13 @@ const OrderDetailPage = () => {
               </>
             )}
             {isNew && (
-              <p className="text-sm text-dark-text-muted">Totals update as you add lines.</p>
+              <>
+                <p className="text-sm text-dark-text-muted">Totals update as you add lines.</p>
+                <div className="flex flex-wrap gap-x-4 gap-y-1 pt-1">
+                  <button type="submit" disabled={saving} className="link-primary">{saving ? 'Saving…' : form.docType === 'quote' ? 'Create quote' : 'Create order'}</button>
+                  <button type="button" onClick={handleCancelClick} className="link-primary">Cancel</button>
+                </div>
+              </>
             )}
           </div>
 
@@ -1033,17 +1218,6 @@ const OrderDetailPage = () => {
             </div>
           </div>
         </div>
-
-          <div className="flex flex-wrap gap-2">
-            {(!readOnly || isNew) && (
-              <button type="submit" disabled={saving} className="btn-primary">
-                {saving ? 'Saving…' : isNew ? 'Create order' : 'Save order'}
-              </button>
-            )}
-            <button type="button" onClick={() => navigate('/orders')} className="btn-secondary">
-              Cancel
-            </button>
-          </div>
       </form>
 
       {/* Create PO: select lines modal */}
@@ -1088,7 +1262,7 @@ const OrderDetailPage = () => {
               <button
                 type="button"
                 disabled={creatingPO || poSelectedLineIds.size === 0}
-                className="btn-primary"
+                className="btn-text-action"
                 onClick={async () => {
                   setError('');
                   setCreatingPO(true);
@@ -1111,7 +1285,7 @@ const OrderDetailPage = () => {
               >
                 {creatingPO ? 'Creating…' : 'Create PO'}
               </button>
-              <button type="button" onClick={() => setPoModalOpen(false)} className="btn-secondary">
+              <button type="button" onClick={() => setPoModalOpen(false)} className="btn-text-action">
                 Cancel
               </button>
             </div>
@@ -1179,7 +1353,7 @@ const OrderDetailPage = () => {
               <button
                 type="button"
                 disabled={submittingDeposit || !depositForm.amount || parseFloat(depositForm.amount) <= 0}
-                className="btn-primary"
+                className="btn-text-action"
                 onClick={async () => {
                   setDepositError('');
                   setSubmittingDeposit(true);
@@ -1207,7 +1381,7 @@ const OrderDetailPage = () => {
               >
                 {submittingDeposit ? 'Adding…' : 'Add deposit'}
               </button>
-              <button type="button" onClick={() => setDepositModalOpen(false)} className="btn-secondary">
+              <button type="button" onClick={() => setDepositModalOpen(false)} className="btn-text-action">
                 Cancel
               </button>
             </div>

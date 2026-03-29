@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import heic2any from 'heic2any';
 import { authFetch } from '../api/client';
 import { BackArrow } from '../components/BackArrow';
 import { apiBase } from '../api/config';
@@ -7,6 +8,35 @@ import { formatDate } from '../utils/formatDate';
 
 const TICKETS_API = `${apiBase}/api/app/tickets`;
 const CUSTOMERS_API = `${apiBase}/api/app/customers`;
+
+/** True if mime type is image/* (including HEIC; we convert HEIC to JPEG for display). */
+function isImageType(mimeType: string | null | undefined): boolean {
+  return !!(mimeType && mimeType.toLowerCase().startsWith('image/'));
+}
+
+/** File type icon for non-image attachments (generic document silhouette). */
+function FileTypeIcon({ mimeType, filename }: { mimeType?: string | null; filename?: string | null }) {
+  const mt = (mimeType || '').toLowerCase();
+  const ext = (filename || '').split('.').pop()?.toLowerCase();
+  const isPdf = mt.includes('pdf') || ext === 'pdf';
+  const isExcel = mt.includes('spreadsheet') || mt.includes('excel') || ext === 'xls' || ext === 'xlsx';
+  const isWord = mt.includes('word') || mt.includes('document') || ext === 'doc' || ext === 'docx';
+  const isHeic = mt.includes('heic') || mt.includes('heif') || ext === 'heic' || ext === 'heif';
+  const label = isPdf ? 'PDF' : isExcel ? 'Excel' : isWord ? 'Word' : isHeic ? 'Photo (HEIC)' : 'File';
+  return (
+    <div className="w-full h-full flex flex-col items-center justify-center text-dark-text-muted bg-dark-bg/50 rounded-lg p-2">
+      <svg className="w-10 h-12 shrink-0" viewBox="0 0 40 48" fill="currentColor" aria-hidden>
+        {isPdf && (
+          <path d="M8 4h12l12 12v28H8V4zm2 2v36h20V18h-10V6H10zm12 1.414L26.586 16H22V7.414z" />
+        )}
+        {!isPdf && (
+          <path d="M8 4h12l12 12v28H8V4zm2 2v36h20V18h-10V6H10zm12 1.414L26.586 16H22V7.414z" />
+        )}
+      </svg>
+      <span className="text-xs font-medium mt-1">{label}</span>
+    </div>
+  );
+}
 
 interface ResolutionUpdate {
   id: number;
@@ -20,6 +50,8 @@ interface TicketImage {
   ticket_id: number;
   position: number;
   created_at: string;
+  mime_type?: string | null;
+  original_filename?: string | null;
 }
 
 interface Ticket {
@@ -65,8 +97,9 @@ const TicketDetailPage = () => {
   const [imageUrls, setImageUrls] = useState<Record<number, string>>({});
   const [addingImage, setAddingImage] = useState(false);
   const [deletingImageId, setDeletingImageId] = useState<number | null>(null);
+  const [viewingImageId, setViewingImageId] = useState<number | null>(null);
 
-  const MAX_IMAGES = 5;
+  const MAX_IMAGES = 10;
 
   const fetchTicket = async () => {
     if (!id) return null;
@@ -175,7 +208,7 @@ const TicketDetailPage = () => {
 
   const isClosed = ticket?.status === 'Closed';
 
-  // Load image blobs and create object URLs for display
+  // Load image blobs and create object URLs for display (convert HEIC to JPEG in-browser so we can preview/open)
   const imageUrlsCreatedRef = useRef<string[]>([]);
   useEffect(() => {
     if (!ticket?.images?.length) {
@@ -187,9 +220,21 @@ const TicketDetailPage = () => {
     ticket.images.forEach((img) => {
       authFetch(`${TICKETS_API}/${ticket.id}/images/${img.id}`)
         .then((res) => (res.ok ? res.blob() : null))
-        .then((blob) => {
+        .then(async (blob) => {
           if (cancelled || !blob) return;
-          const url = URL.createObjectURL(blob);
+          const mt = (blob.type || img.mime_type || '').toLowerCase();
+          const isHeic = mt.includes('heic') || mt.includes('heif');
+          let displayBlob = blob;
+          if (isHeic) {
+            try {
+              const converted = await heic2any({ blob, toType: 'image/jpeg' });
+              displayBlob = Array.isArray(converted) ? converted[0] : converted;
+            } catch {
+              // fallback: use original blob (will show as file icon)
+            }
+          }
+          if (cancelled) return;
+          const url = URL.createObjectURL(displayBlob);
           imageUrlsCreatedRef.current.push(url);
           setImageUrls((prev) => ({ ...prev, [img.id]: url }));
         })
@@ -217,10 +262,10 @@ const TicketDetailPage = () => {
   const handleAddImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
-    if (!ticket || !file || !file.type.startsWith('image/')) return;
+    if (!ticket || !file) return;
     const count = (ticket.images?.length ?? 0);
     if (count >= MAX_IMAGES) {
-      setError(`Maximum ${MAX_IMAGES} images per ticket`);
+      setError(`Maximum ${MAX_IMAGES} attachments per ticket`);
       return;
     }
     setAddingImage(true);
@@ -230,9 +275,14 @@ const TicketDetailPage = () => {
       const res = await authFetch(`${TICKETS_API}/${ticket.id}/images`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data: base64, encoding: 'base64' }),
+        body: JSON.stringify({
+          data: base64,
+          encoding: 'base64',
+          mime_type: file.type || 'application/octet-stream',
+          original_filename: file.name,
+        }),
       });
-      if (!res.ok) throw new Error('Failed to add image');
+      if (!res.ok) throw new Error('Failed to add attachment');
       const added = await res.json();
       setTicket((prev) =>
         prev
@@ -240,7 +290,7 @@ const TicketDetailPage = () => {
           : null
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to add image');
+      setError(err instanceof Error ? err.message : 'Failed to add attachment');
     } finally {
       setAddingImage(false);
     }
@@ -291,8 +341,13 @@ const TicketDetailPage = () => {
   if (!ticket) return null;
 
   const handleViewAttachment = (imageId: number) => {
-    const url = imageUrls[imageId];
-    if (url) window.open(url, '_blank');
+    const img = ticket?.images?.find((i) => i.id === imageId);
+    if (img && isImageType(img.mime_type)) {
+      setViewingImageId(imageId);
+    } else {
+      const url = imageUrls[imageId];
+      if (url) window.open(url, '_blank');
+    }
   };
 
   const handleDeleteTicket = async () => {
@@ -307,8 +362,49 @@ const TicketDetailPage = () => {
     }
   };
 
+  const viewingImage = viewingImageId != null ? ticket.images?.find((i) => i.id === viewingImageId) : null;
+  const viewingUrl = viewingImageId != null ? imageUrls[viewingImageId] : null;
+
   return (
     <div className="page-container">
+      {/* In-app image viewer modal */}
+      {viewingImageId != null && viewingImage && (
+        <div
+          className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/80 p-4"
+          onClick={() => setViewingImageId(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="View attachment"
+        >
+          <div className="flex flex-col items-center gap-3 max-h-full" onClick={(e) => e.stopPropagation()}>
+            {viewingUrl ? (
+              <img
+                src={viewingUrl}
+                alt={viewingImage.original_filename || 'Attachment'}
+                className="max-h-[80vh] max-w-full object-contain rounded"
+              />
+            ) : (
+              <span className="text-white">Loading…</span>
+            )}
+            <div className="flex gap-2 flex-wrap justify-center">
+              {viewingUrl && (
+                <a
+                  href={viewingUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn-primary text-sm py-1.5 px-3"
+                >
+                  Open in new tab
+                </a>
+              )}
+              <button type="button" onClick={() => setViewingImageId(null)} className="btn-primary text-sm py-1.5 px-3">
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="mb-4">
         <BackArrow to="/tickets" label="Back to Tickets" />
       </div>
@@ -329,49 +425,77 @@ const TicketDetailPage = () => {
 
           <div className="rounded-xl bg-dark-surface border border-dark-border p-4 sm:p-6">
             <h2 className="text-lg font-semibold text-dark-text mb-3">Attachments</h2>
-            <ul className="space-y-2">
-              {(ticket.images || []).map((img, idx) => (
-                <li
-                  key={img.id}
-                  className="flex items-center justify-between gap-2 py-2 border-b border-dark-border last:border-0"
-                >
-                  <span className="text-dark-text text-sm truncate">Attachment {idx + 1}</span>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => handleViewAttachment(img.id)}
-                      disabled={!imageUrls[img.id]}
-                      className="link-primary text-sm"
+            {(ticket.images?.length ?? 0) === 0 ? (
+              <p className="text-dark-text-muted text-sm py-2">No attachments.</p>
+            ) : (
+              <div className="flex gap-4 overflow-x-auto pb-2 snap-x snap-mandatory scroll-smooth" style={{ minHeight: 160 }}>
+                {(ticket.images || []).map((img, idx) => {
+                  const isImage = isImageType(img.mime_type);
+                  const url = imageUrls[img.id];
+                  return (
+                    <div
+                      key={img.id}
+                      className="flex-shrink-0 w-[140px] snap-start rounded-lg border border-dark-border bg-dark-bg/30 overflow-hidden flex flex-col"
                     >
-                      {imageUrls[img.id] ? 'View' : 'Loading…'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteImage(img.id)}
-                      disabled={deletingImageId === img.id}
-                      className="text-red-400 hover:underline text-sm"
-                      aria-label="Delete attachment"
-                    >
-                      {deletingImageId === img.id ? '…' : 'Delete'}
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
+                      <button
+                        type="button"
+                        onClick={() => url && handleViewAttachment(img.id)}
+                        disabled={!url}
+                        className="flex-1 min-h-[100px] w-full flex items-center justify-center overflow-hidden p-1 text-left hover:bg-dark-surface-elevated/50 transition-colors"
+                      >
+                        {isImage ? (
+                          url ? (
+                            <img
+                              src={url}
+                              alt={img.original_filename || `Attachment ${idx + 1}`}
+                              className="max-h-[120px] w-full object-contain"
+                            />
+                          ) : (
+                            <span className="text-dark-text-muted text-sm">Loading…</span>
+                          )
+                        ) : (
+                          <FileTypeIcon mimeType={img.mime_type} filename={img.original_filename} />
+                        )}
+                      </button>
+                      <div className="p-1.5 border-t border-dark-border flex flex-col gap-0.5">
+                        <span className="text-dark-text text-xs truncate" title={img.original_filename || undefined}>
+                          {img.original_filename || `Attachment ${idx + 1}`}
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => url && handleViewAttachment(img.id)}
+                            disabled={!url}
+                            className="btn-text-action text-xs py-0.5 px-1"
+                          >
+                            Open
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteImage(img.id)}
+                            disabled={deletingImageId === img.id}
+                            className="text-red-400 hover:underline text-xs py-0.5 px-1"
+                            aria-label="Delete attachment"
+                          >
+                            {deletingImageId === img.id ? '…' : 'Delete'}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
             {(ticket.images?.length ?? 0) < MAX_IMAGES && (
               <label className="mt-3 inline-flex items-center gap-2 text-primary hover:underline cursor-pointer text-sm">
                 <input
                   type="file"
-                  accept="image/*"
                   className="sr-only"
                   onChange={handleAddImage}
                   disabled={addingImage}
                 />
                 {addingImage ? 'Adding…' : '+ Add attachment'}
               </label>
-            )}
-            {(ticket.images?.length ?? 0) === 0 && (
-              <p className="text-dark-text-muted text-sm py-2">No attachments.</p>
             )}
           </div>
 

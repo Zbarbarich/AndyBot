@@ -39,17 +39,27 @@ const purchaseOrderQueries = {
 
   getById: `
     SELECT po.id, po.po_number, po.order_id, po.created_at, po.status,
-           q.document_number AS order_document_number
+           q.document_number AS order_document_number,
+           c.name AS customer_name,
+           c.physical_address AS customer_address,
+           c.email AS customer_email,
+           c.phone AS customer_phone
     FROM purchase_orders po
     JOIN quotes_orders q ON q.id = po.order_id
+    JOIN customers c ON c.id = q.customer_id
     WHERE po.id = $1
   `,
 
   getLinesByPoId: `
-    SELECT pol.id, pol.purchase_order_id, pol.quote_order_line_id, pol.item_id, pol.description, pol.quantity, pol.unit_cost, pol.sort_order,
-           pol.ordered_at, pol.ordered_via,
-           i.sku, i.name AS item_name
+    SELECT pol.id, pol.purchase_order_id, pol.quote_order_line_id, pol.item_id, pol.sort_order,
+           pol.ordered_at, pol.ordered_via, pol.ordered_via_notes, pol.received_at,
+           COALESCE(NULLIF(TRIM(qol.description), ''), pol.description) AS description,
+           pol.quantity,
+           COALESCE(NULLIF(pol.unit_cost::numeric, 0), qol.unit_price::numeric, pol.unit_cost) AS unit_cost,
+           COALESCE(NULLIF(TRIM(qol.sku), ''), i.sku) AS sku,
+           i.name AS item_name
     FROM purchase_order_lines pol
+    LEFT JOIN quote_order_lines qol ON qol.id = pol.quote_order_line_id
     LEFT JOIN items i ON i.id = pol.item_id
     WHERE pol.purchase_order_id = $1
     ORDER BY pol.sort_order ASC, pol.id ASC
@@ -57,9 +67,22 @@ const purchaseOrderQueries = {
 
   updateLineOrderedByPoAndLine: `
     UPDATE purchase_order_lines
-    SET ordered_at = $3, ordered_via = $4
+    SET ordered_at = $3, ordered_via = $4, ordered_via_notes = $5
     WHERE purchase_order_id = $1 AND id = $2
-    RETURNING id, purchase_order_id, quote_order_line_id, item_id, description, quantity, unit_cost, sort_order, ordered_at, ordered_via
+    RETURNING id, purchase_order_id, quote_order_line_id, item_id, description, quantity, unit_cost, sort_order, ordered_at, ordered_via, ordered_via_notes, received_at
+  `,
+
+  updateLineReceived: `
+    UPDATE purchase_order_lines
+    SET received_at = $3
+    WHERE purchase_order_id = $1 AND id = $2 AND received_at IS NULL
+    RETURNING id, purchase_order_id, quote_order_line_id, item_id, description, quantity, unit_cost, sort_order, ordered_at, ordered_via, ordered_via_notes, received_at
+  `,
+
+  countLinesNotReceived: `
+    SELECT COUNT(*)::int AS count
+    FROM purchase_order_lines
+    WHERE purchase_order_id = $1 AND received_at IS NULL
   `,
 
   updateStatus: `

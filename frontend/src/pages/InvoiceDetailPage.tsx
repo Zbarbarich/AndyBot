@@ -306,13 +306,13 @@ const InvoiceDetailPage = () => {
               )}
               {paymentError && <p className="text-red-400 text-sm">{paymentError}</p>}
               <div className="flex flex-wrap gap-2 pt-2">
-                <button type="submit" disabled={submittingPayment} className="btn-primary">
+                <button type="submit" disabled={submittingPayment} className="btn-text-action">
                   {submittingPayment ? 'Recording...' : 'Confirm payment'}
                 </button>
                 <button
                   type="button"
                   onClick={() => { setShowPaymentModal(false); setPaymentError(''); setPaymentReference(''); }}
-                  className="btn-secondary"
+                  className="btn-text-action"
                 >
                   Cancel
                 </button>

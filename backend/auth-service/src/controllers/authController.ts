@@ -78,7 +78,7 @@ export const authController = {
         res.status(401).json({ error: "invalid credentials" });
       }
     } catch (error: unknown) {
-      console.error("Login error");
+      console.error("Login error", error);
       res.status(500).json({
         error: "Server error",
       });

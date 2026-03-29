@@ -62,12 +62,17 @@ const invoiceQueries = {
   `,
 
   orderBillableLines: `
-    SELECT id, quote_order_id, item_id, description, quantity, unit_price, sort_order,
-           COALESCE(quantity_billed, 0)::numeric AS quantity_billed
-    FROM quote_order_lines
-    WHERE quote_order_id = $1 AND billing_status = 'billable'
-      AND (quantity - COALESCE(quantity_billed, 0)) > 0
-    ORDER BY sort_order ASC, id ASC
+    SELECT qol.id, qol.quote_order_id, qol.item_id, qol.description, qol.quantity, qol.unit_price, qol.sort_order,
+           COALESCE(qol.quantity_billed, 0)::numeric AS quantity_billed
+    FROM quote_order_lines qol
+    WHERE qol.quote_order_id = $1 AND qol.billing_status = 'billable'
+      AND (qol.quantity - COALESCE(qol.quantity_billed, 0)) > 0
+      AND (qol.id NOT IN (
+        SELECT pol.quote_order_line_id FROM purchase_order_lines pol
+        JOIN purchase_orders po ON po.id = pol.purchase_order_id
+        WHERE po.status = 'open' AND pol.received_at IS NULL AND pol.quote_order_line_id IS NOT NULL
+      ))
+    ORDER BY qol.sort_order ASC, qol.id ASC
   `,
 
   createInvoice: `

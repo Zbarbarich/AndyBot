@@ -10,9 +10,15 @@ const purchaseOrderQueries = {
   `,
 
   getLinesByPoId: `
-    SELECT pol.id, pol.description, pol.quantity, pol.unit_cost, pol.sort_order,
-           i.sku, i.name AS item_name
+    SELECT pol.id,
+           COALESCE(NULLIF(TRIM(qol.description), ''), pol.description) AS description,
+           pol.quantity,
+           COALESCE(NULLIF(pol.unit_cost::numeric, 0), qol.unit_price::numeric, pol.unit_cost) AS unit_cost,
+           pol.sort_order,
+           COALESCE(NULLIF(TRIM(qol.sku), ''), i.sku) AS sku,
+           i.name AS item_name
     FROM purchase_order_lines pol
+    LEFT JOIN quote_order_lines qol ON qol.id = pol.quote_order_line_id
     LEFT JOIN items i ON i.id = pol.item_id
     WHERE pol.purchase_order_id = $1
     ORDER BY pol.sort_order ASC, pol.id ASC

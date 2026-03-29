@@ -2,7 +2,6 @@ import { Response } from 'express';
 import { query } from '../config/db';
 import purchaseOrderQueries from '../queries/purchaseOrderQueries';
 import quoteOrderQueries from '../queries/quoteOrderQueries';
-import itemQueries from '../queries/itemQueries';
 import { AppRequest } from '../middleware/userContext';
 
 export const purchaseOrderController = {
@@ -51,19 +50,15 @@ export const purchaseOrderController = {
       const poId = (poResult.rows[0] as { id: number }).id;
       for (let i = 0; i < toInclude.length; i++) {
         const ol = toInclude[i];
-        let cost = 0;
-        if (ol.item_id != null) {
-          const itemRow = await query(itemQueries.getById, [ol.item_id]);
-          const ourCost = (itemRow.rows[0] as { our_cost?: string | number } | undefined)?.our_cost;
-          cost = ourCost != null ? Number(ourCost) : 0;
-        }
+        const unitCost =
+          ol.unit_price != null && ol.unit_price !== '' ? Number(ol.unit_price) : 0;
         await query(purchaseOrderQueries.createLine, [
           poId,
           ol.id,
           ol.item_id,
           ol.description,
           Number(ol.quantity),
-          cost,
+          unitCost,
           i,
         ]);
       }
@@ -130,13 +125,15 @@ export const purchaseOrderController = {
         res.status(400).json({ error: 'Invalid id' });
         return;
       }
-      const { ordered_at, ordered_via } = req.body || {};
+      const { ordered_at, ordered_via, ordered_via_notes } = req.body || {};
       const orderedAt = ordered_at === undefined ? new Date() : (ordered_at === null ? null : new Date(ordered_at));
+      const notes = ordered_via_notes != null ? String(ordered_via_notes).slice(0, 2000) : null;
       const result = await query(purchaseOrderQueries.updateLineOrderedByPoAndLine, [
         poId,
         lineId,
         orderedAt,
         ordered_via !== undefined ? (ordered_via == null ? null : String(ordered_via).slice(0, 200)) : null,
+        notes,
       ]);
       if (result.rows.length === 0) {
         res.status(404).json({ error: 'Purchase order or line not found' });
@@ -149,11 +146,37 @@ export const purchaseOrderController = {
     }
   },
 
+  async updateLineReceived(req: AppRequest, res: Response): Promise<void> {
+    try {
+      const poId = parseInt(req.params.id, 10);
+      const lineId = parseInt(req.params.lineId, 10);
+      if (isNaN(poId) || isNaN(lineId)) {
+        res.status(400).json({ error: 'Invalid id' });
+        return;
+      }
+      const result = await query(purchaseOrderQueries.updateLineReceived, [poId, lineId, new Date()]);
+      if (result.rows.length === 0) {
+        res.status(404).json({ error: 'Purchase order or line not found, or line already received' });
+        return;
+      }
+      res.json(result.rows[0]);
+    } catch (e) {
+      console.error('purchaseOrderController.updateLineReceived', e);
+      res.status(500).json({ error: 'Failed to mark line received' });
+    }
+  },
+
   async close(req: AppRequest, res: Response): Promise<void> {
     try {
       const id = parseInt(req.params.id, 10);
       if (isNaN(id)) {
         res.status(400).json({ error: 'Invalid id' });
+        return;
+      }
+      const countResult = await query(purchaseOrderQueries.countLinesNotReceived, [id]);
+      const count = (countResult.rows[0] as { count: number })?.count ?? 0;
+      if (count > 0) {
+        res.status(400).json({ error: 'All lines must be received before closing the PO.' });
         return;
       }
       const result = await query(purchaseOrderQueries.updateStatus, [id, 'closed']);
