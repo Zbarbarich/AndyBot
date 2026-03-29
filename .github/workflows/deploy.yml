@@ -41,15 +41,21 @@ jobs:
           command_timeout: 60m
           script: |
             set -e
+            export GIT_TERMINAL_PROMPT=0
             if [ -n "$DEPLOY_PATH" ]; then
               cd "$DEPLOY_PATH"
             else
               cd ~/theNineteenthChamber
             fi
-            git fetch origin && git reset --hard origin/main
-            chmod +x deploy/build-sequential.sh
+            echo "Updating repo from origin/main..."
+            git fetch origin
+            git reset --hard origin/main
+            echo "Building from commit:"
+            git log -1 --oneline
+            git rev-parse HEAD
+            chmod +x deploy/build-sequential.sh deploy/prune-docker.sh
             ./deploy/build-sequential.sh
             docker compose -f deploy/docker-compose.yml --env-file deploy/.env restart caddy
-            docker image prune -a -f
+            ./deploy/prune-docker.sh
         env:
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
