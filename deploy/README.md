@@ -45,6 +45,30 @@ Alternative: use a larger instance (e.g. Oracle Ampere with 6 GB RAM) so swap is
 
 This builds auth-service, customer-service, ticket-service, order-service, invoice-service, pdf-service, api-gateway, and frontend in order, then runs `docker compose up -d`. Slower but reliable on small instances or flaky networks.
 
+## Faster builds and limiting Docker disk
+
+### What changed in the repo
+
+- **BuildKit** is enabled in `deploy/build-sequential.sh` (`DOCKER_BUILDKIT=1`, `COMPOSE_DOCKER_CLI_BUILD=1`).
+- **npm cache** persists across image builds via `RUN --mount=type=cache,target=/root/.npm` in each service `Dockerfile` (requires BuildKit). The first deploy after this change still downloads everything; later deploys reuse the cache and **`npm ci` gets much faster**.
+- **`deploy/prune-docker.sh`** (called from GitHub Actions after each deploy):
+  1. **`docker container prune -f`** — removes **stopped** containers so old image references are released.
+  2. **`docker image prune -a -f`** — removes **all images not used by any container**. Running containers keep **one** live generation per service (no pile-up of old `deploy-*` images).
+  3. **Build cache cap** — runs `docker builder prune -f --max-used-space "$MAX_BUILD_CACHE"` (default **`3GB`**) so roughly **~two recent deploys’** worth of BuildKit/npm cache can remain. Smaller VPS: set `MAX_BUILD_CACHE=2GB` when calling the script.
+
+Override cache cap on the VPS or in CI by exporting before the script, e.g. `export MAX_BUILD_CACHE=2GB` (you would add that to the SSH script in `.github/workflows/deploy.yml` if you want it permanent).
+
+**Docker version:** `--max-used-space` needs a recent Docker Engine (about **23+**). Older engines fall back to `docker builder prune -f` (frees unused cache only).
+
+### Manual prune on the VPS
+
+From the **repo root** on the server:
+
+```bash
+chmod +x deploy/prune-docker.sh
+./deploy/prune-docker.sh
+```
+
 ## Database migrations
 
 Migrations live in `backend/shared/schema/` (001–013). They must be run **once** against the deployed PostgreSQL before the app works.
@@ -82,3 +106,44 @@ Edit `deploy/Caddyfile` and replace `yourdomain.com` with your domain. Caddy wil
 ## GitHub Actions
 
 See [docs/DEPLOYMENT_ORACLE_CI_ACCESS.md](../docs/DEPLOYMENT_ORACLE_CI_ACCESS.md) for CI/CD setup (secrets `SSH_HOST`, `SSH_USER`, `SSH_PRIVATE_KEY`, optional `DEPLOY_PATH`). Production `.env` stays on the server in `deploy/.env`; do not put it in GitHub.
+
+### Live site still shows old UI after a “successful” deploy
+
+**Cause A — Git on the VPS cannot pull from GitHub.** If `git remote` uses HTTPS and the server has no valid credential, `git fetch` fails with `Authentication failed for 'https://github.com/...'`. With `set -e` in the deploy script, that should **fail the GitHub Actions job** before any Docker build. If you ever see that error in a run that still went on to build images, treat the log with care (mixed runs or an old server-side script). After fixing Git, confirm a green deploy log includes **“Building from commit”** and that the hash matches **main** on GitHub.
+
+**Fix A (recommended):** Use SSH and a deploy key:
+
+1. On the VPS: `cd` to the clone (e.g. `~/theNineteenthChamber` or `DEPLOY_PATH`), then:
+   ```bash
+   git remote set-url origin git@github.com:YOUR_USER/theNineteenthChamber.git
+   ```
+2. In the GitHub repo: **Settings → Deploy keys → Add deploy key**, paste the server’s **public** SSH key (`~/.ssh/id_ed25519.pub` or similar), allow read access.
+3. Test on the server: `git fetch origin` (must complete with no auth error).
+
+**Fix B:** Keep HTTPS and use a [fine-grained or classic PAT](https://docs.github.com/en/authentication) with repo read access in the remote URL or credential helper (avoid storing the token in plain text in shared scripts; prefer deploy key).
+
+**Cause B — Workflow only deploys `main`.** [.github/workflows/deploy.yml](../.github/workflows/deploy.yml) runs on `push` to **`main`**. Commits that exist only on a feature branch are not deployed until they are merged (or pushed) to `main`.
+
+**Verify what production is running:** SSH to the VPS, `cd` to the repo root, run `git rev-parse HEAD` and `git log -1 --oneline`, and compare to the latest commit on GitHub **main**. They must match after a good deploy. The workflow log also prints the deployed commit after `git reset` (see “Building from commit”).
+
+### How to push deploy changes and get them live
+
+The workflow runs only on **`push` to `main`**. Use this checklist whenever you change Dockerfiles, `deploy/`, or `.github/workflows/deploy.yml`.
+
+1. On your **laptop**, from the repo root:
+   ```bash
+   git status
+   git add -A
+   git commit -m "Your message"
+   ```
+2. Put the commit on **`main`** (pick one):
+   - **Merge a PR** into `main` on GitHub, or  
+   - Locally: `git checkout main && git pull origin main && git merge your-feature-branch`
+3. **Push `main`:**
+   ```bash
+   git push origin main
+   ```
+4. Open **GitHub → Actions → Deploy to VPS** and wait for green. Scroll to **“Building from commit”** and confirm the hash matches the commit you just pushed.
+5. On the **VPS**, confirm Git auth works (`git fetch origin` from the deploy clone). If fetch fails, fix the deploy key / remote URL (see above) or production will keep rebuilding old files.
+
+After a successful run, optional: SSH in and run `docker system df` to see image and build-cache usage.
