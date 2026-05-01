@@ -14,6 +14,8 @@ interface InvoiceLine {
   quantity: number;
   unit_price: number;
   sort_order: number;
+  unit_of_measure?: string | null;
+  item_unit_of_measure?: string | null;
 }
 
 interface InvoiceDetail {
@@ -200,6 +202,7 @@ const InvoiceDetailPage = () => {
               <tr>
                 <th className="text-left py-1.5 px-2 font-medium text-dark-text-muted">Description</th>
                 <th className="text-right py-1.5 px-2 font-medium text-dark-text-muted w-16">Qty</th>
+                <th className="text-left py-1.5 px-2 font-medium text-dark-text-muted w-14">U/M</th>
                 <th className="text-right py-1.5 px-2 font-medium text-dark-text-muted w-24">Unit price</th>
                 <th className="text-right py-1.5 px-2 font-medium text-dark-text-muted w-24">Extended</th>
               </tr>
@@ -209,6 +212,9 @@ const InvoiceDetailPage = () => {
                 <tr key={line.id} className="border-t border-dark-border">
                   <td className="py-1.5 px-2">{line.description ?? '—'}</td>
                   <td className="py-1.5 px-2 text-right font-mono">{Number(line.quantity)}</td>
+                  <td className="py-1.5 px-2 font-mono text-sm">
+                    {line.unit_of_measure?.trim() || line.item_unit_of_measure?.trim() || 'EA'}
+                  </td>
                   <td className="py-1.5 px-2 text-right font-mono whitespace-nowrap">{Number(line.unit_price).toFixed(2)}</td>
                   <td className="py-1.5 px-2 text-right font-mono whitespace-nowrap">{(Number(line.quantity) * Number(line.unit_price)).toFixed(2)}</td>
                 </tr>

@@ -132,6 +132,28 @@ const quoteOrderQueries = {
     WHERE id = $1
     RETURNING id, quote_order_id, item_id, description, quantity, unit_price, sort_order, billing_status, unit_of_measure
   `,
+
+  /** Order line update scoped to order; preserves sku when $9 is null; does not touch quantity_billed. */
+  updateOrderLine: `
+    UPDATE quote_order_lines
+    SET item_id = $2,
+        description = $3,
+        quantity = $4,
+        unit_price = $5,
+        sort_order = $6,
+        billing_status = COALESCE($7, billing_status),
+        unit_of_measure = COALESCE(NULLIF(TRIM($8), ''), unit_of_measure),
+        sku = COALESCE($9, sku)
+    WHERE id = $1 AND quote_order_id = $10
+    RETURNING id, quote_order_id, item_id, description, quantity, unit_price, sort_order, billing_status, unit_of_measure
+  `,
+
+  /** Remove a line only if nothing has been invoiced on it (quantity_billed = 0). */
+  deleteUnbilledOrderLine: `
+    DELETE FROM quote_order_lines
+    WHERE id = $1 AND quote_order_id = $2 AND COALESCE(quantity_billed, 0) = 0
+    RETURNING id
+  `,
   updateLineBillingStatus: `
     UPDATE quote_order_lines SET billing_status = $2
     WHERE id = $1 AND quote_order_id = $3

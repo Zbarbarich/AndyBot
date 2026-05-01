@@ -6,7 +6,25 @@ import purchaseOrderQueries from '../queries/purchaseOrderQueries';
 import orderInvoiceQueries from '../queries/orderInvoiceQueries';
 import { AppRequest } from '../middleware/userContext';
 
-type LineInput = { item_id?: number; description?: string; quantity: number; unit_price: number; sort_order?: number; billing_status?: string; unit_of_measure?: string; include_in_po?: boolean; po_unit_cost?: number };
+type LineInput = {
+  id?: number;
+  item_id?: number;
+  description?: string;
+  quantity: number;
+  unit_price: number;
+  sort_order?: number;
+  billing_status?: string;
+  unit_of_measure?: string;
+  include_in_po?: boolean;
+  po_unit_cost?: number;
+};
+
+type ExistingOrderLineRow = {
+  id: number;
+  quote_order_id: number;
+  quantity: string | number;
+  quantity_billed: string | number;
+};
 
 type PoAssignment = { purchase_order_id: number; po_number: string; purchase_order_status: string };
 
@@ -486,55 +504,162 @@ export const quoteOrderController = {
       const lineList: LineInput[] = Array.isArray(lines) ? lines : [];
       const { subtotal, tax_amount, total } = computeTotals(lineList, taxRate, shippingAmount);
 
+      const existingLinesResult = await query(quoteOrderQueries.getLinesByQuoteOrderId, [id]);
+      const existingRows = existingLinesResult.rows as ExistingOrderLineRow[];
+      const existingById = new Map(existingRows.map((r) => [r.id, r]));
+
+      const clientIds: number[] = [];
+      const seenClientIds = new Set<number>();
+      for (const l of lineList) {
+        if (l.id == null) continue;
+        const lid = parseInt(String(l.id), 10);
+        if (isNaN(lid) || lid <= 0) {
+          res.status(400).json({ error: 'Invalid line id' });
+          return;
+        }
+        if (seenClientIds.has(lid)) {
+          res.status(400).json({ error: 'Duplicate line id in request' });
+          return;
+        }
+        seenClientIds.add(lid);
+        clientIds.push(lid);
+      }
+      const clientIdSet = new Set(clientIds);
+
+      for (const row of existingRows) {
+        const qb = Number(row.quantity_billed ?? 0);
+        if (qb > 0 && !clientIdSet.has(row.id)) {
+          res.status(400).json({
+            error:
+              'Cannot remove a line that has already been invoiced. Include every invoiced line, or add new lines for additional quantity instead of increasing quantity on an invoiced line.',
+          });
+          return;
+        }
+      }
+
+      for (const l of lineList) {
+        if (l.id == null) continue;
+        const lid = parseInt(String(l.id), 10);
+        const existing = existingById.get(lid);
+        if (!existing) {
+          res.status(400).json({ error: `Unknown line id ${lid} for this order` });
+          return;
+        }
+        const qb = Number(existing.quantity_billed ?? 0);
+        const newQty = parseFloat(String(l.quantity));
+        if (!Number.isFinite(newQty) || newQty < 0) {
+          res.status(400).json({ error: 'Each line must have a valid quantity' });
+          return;
+        }
+        const oldQty = Number(existing.quantity);
+        if (qb > 0) {
+          if (newQty < qb) {
+            res.status(400).json({ error: 'Quantity cannot be less than the amount already invoiced on a line.' });
+            return;
+          }
+          if (newQty > oldQty) {
+            res.status(400).json({
+              error: 'Cannot increase quantity on a line that has been invoiced; add a new line for additional goods.',
+            });
+            return;
+          }
+        }
+      }
+
       // Orders can only be closed by invoicing all items; ignore client sending status 'closed'
       const statusForUpdate = status === 'closed' ? undefined : (status ?? undefined);
 
-      await query(quoteOrderQueries.updateQuoteOrder, [
-        id,
-        customer_id != null ? parseInt(customer_id, 10) : undefined,
-        ticket_id !== undefined ? (ticket_id == null ? null : parseInt(ticket_id, 10)) : undefined,
-        statusForUpdate,
-        undefined,
-        order_date ?? undefined,
-        notes !== undefined ? notes : undefined,
-        customer_po_number !== undefined ? customer_po_number : undefined,
-        subtotal,
-        taxRate,
-        tax_amount,
-        shippingAmount,
-        total,
-      ]);
-
-      await query(quoteOrderQueries.deleteLinesByQuoteOrderId, [id]);
       const document_number = doc.document_number;
-      for (let i = 0; i < lineList.length; i++) {
-        const l = lineList[i];
-        const qty = parseFloat(String(l.quantity)) || 1;
-        const up = parseFloat(String(l.unit_price)) || 0;
-        let sku: string | null = null;
-        const clientUom = l.unit_of_measure != null ? String(l.unit_of_measure).trim() : '';
-        let unitOfMeasure: string = clientUom || 'EA';
-        if (l.item_id != null) {
-          const skuRes = await query(itemQueries.getSkuById, [l.item_id]);
-          if (skuRes.rows[0]) sku = skuRes.rows[0].sku;
-          if (!clientUom) {
-            const itemRes = await query(itemQueries.getById, [l.item_id]);
-            if (itemRes.rows[0]?.unit_of_measure) unitOfMeasure = itemRes.rows[0].unit_of_measure;
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+
+        await client.query(quoteOrderQueries.updateQuoteOrder, [
+          id,
+          customer_id != null ? parseInt(customer_id, 10) : undefined,
+          ticket_id !== undefined ? (ticket_id == null ? null : parseInt(ticket_id, 10)) : undefined,
+          statusForUpdate,
+          undefined,
+          order_date ?? undefined,
+          notes !== undefined ? notes : undefined,
+          customer_po_number !== undefined ? customer_po_number : undefined,
+          subtotal,
+          taxRate,
+          tax_amount,
+          shippingAmount,
+          total,
+        ]);
+
+        for (const row of existingRows) {
+          if (!clientIdSet.has(row.id)) {
+            const del = await client.query(quoteOrderQueries.deleteUnbilledOrderLine, [row.id, id]);
+            if ((del.rowCount ?? 0) === 0) {
+              await client.query('ROLLBACK');
+              res.status(409).json({
+                error: 'Could not remove an order line; it may have been invoiced since this page was loaded. Refresh and try again.',
+              });
+              return;
+            }
           }
         }
-        await query(quoteOrderQueries.insertLine, [
-          id,
-          l.item_id ?? null,
-          l.description ?? null,
-          qty,
-          up,
-          l.sort_order ?? i,
-          'pending',
-          id,
-          document_number,
-          sku,
-          unitOfMeasure,
-        ]);
+
+        for (let i = 0; i < lineList.length; i++) {
+          const l = lineList[i];
+          const up = parseFloat(String(l.unit_price)) || 0;
+          let sku: string | null = null;
+          const clientUom = l.unit_of_measure != null ? String(l.unit_of_measure).trim() : '';
+          let unitOfMeasure: string = clientUom || 'EA';
+          if (l.item_id != null) {
+            const skuRes = await client.query(itemQueries.getSkuById, [l.item_id]);
+            if (skuRes.rows[0]) sku = skuRes.rows[0].sku;
+            if (!clientUom) {
+              const itemRes = await client.query(itemQueries.getById, [l.item_id]);
+              if (itemRes.rows[0]?.unit_of_measure) unitOfMeasure = itemRes.rows[0].unit_of_measure;
+            }
+          }
+
+          const sortOrder = l.sort_order ?? i;
+          const lineId = l.id != null ? parseInt(String(l.id), 10) : NaN;
+
+          if (!isNaN(lineId) && lineId > 0 && existingById.has(lineId)) {
+            const qty = parseFloat(String(l.quantity));
+            const q = Number.isFinite(qty) && qty >= 0 ? qty : 1;
+            await client.query(quoteOrderQueries.updateOrderLine, [
+              lineId,
+              l.item_id ?? null,
+              l.description ?? null,
+              q,
+              up,
+              sortOrder,
+              null,
+              unitOfMeasure,
+              sku,
+              id,
+            ]);
+          } else {
+            const qty = parseFloat(String(l.quantity)) || 1;
+            await client.query(quoteOrderQueries.insertLine, [
+              id,
+              l.item_id ?? null,
+              l.description ?? null,
+              qty,
+              up,
+              sortOrder,
+              'pending',
+              id,
+              document_number,
+              sku,
+              unitOfMeasure,
+            ]);
+          }
+        }
+
+        await client.query('COMMIT');
+      } catch (e) {
+        await client.query('ROLLBACK').catch(() => {});
+        throw e;
+      } finally {
+        client.release();
       }
 
       const updated = await query(quoteOrderQueries.getByIdWithCustomer, [id]);

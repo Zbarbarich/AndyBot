@@ -14,10 +14,14 @@ const invoiceQueries = {
   `,
 
   getLinesByInvoiceId: `
-    SELECT id, invoice_id, order_line_id, item_id, description, quantity, unit_price, sort_order
-    FROM invoice_lines
-    WHERE invoice_id = $1
-    ORDER BY sort_order ASC, id ASC
+    SELECT il.id, il.invoice_id, il.order_line_id, il.item_id, il.description, il.quantity, il.unit_price, il.sort_order,
+           COALESCE(NULLIF(TRIM(qol.unit_of_measure), ''), NULLIF(TRIM(i.unit_of_measure), ''), 'EA') AS unit_of_measure,
+           i.unit_of_measure AS item_unit_of_measure
+    FROM invoice_lines il
+    LEFT JOIN quote_order_lines qol ON qol.id = il.order_line_id
+    LEFT JOIN items i ON i.id = il.item_id
+    WHERE il.invoice_id = $1
+    ORDER BY il.sort_order ASC, il.id ASC
   `,
 
   getPaymentsByInvoiceId: `

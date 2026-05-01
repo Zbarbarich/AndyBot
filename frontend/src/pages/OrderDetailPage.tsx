@@ -345,6 +345,16 @@ const OrderDetailPage = () => {
           setError(`A line has quantity below what is already invoiced (${billed}). Increase quantity or adjust billing first.`);
           return;
         }
+        if (l.id != null && billed > 0) {
+          const orig = order.lines.find((o) => o.id === l.id);
+          const origQty = orig != null ? Number(orig.quantity) : l.quantity;
+          if (Number(l.quantity) > origQty) {
+            setError(
+              'Cannot increase quantity on a line that has been invoiced. Add a new line for additional goods.',
+            );
+            return;
+          }
+        }
       }
     }
     setSaving(true);
@@ -359,6 +369,7 @@ const OrderDetailPage = () => {
         tax_rate: parseFloat(form.tax_rate) || 0,
         shipping_amount: parseFloat(form.shipping_amount) || 0,
         lines: lines.map((l, i) => ({
+          ...(order?.type === 'order' && l.id != null ? { id: l.id } : {}),
           item_id: l.item_id || null,
           description: l.description || null,
           quantity: l.quantity,
@@ -530,6 +541,11 @@ const OrderDetailPage = () => {
     setUnitPriceDisplay((prev) => [...prev, '']);
   };
   const removeLine = (index: number) => {
+    const row = lines[index];
+    if (row && Number(row.quantity_billed ?? 0) > 0) {
+      setError('Cannot remove a line that has been invoiced.');
+      return;
+    }
     setLines((prev) => prev.filter((_, i) => i !== index));
     setQuantityDisplay((prev) => prev.filter((_, i) => i !== index));
     setUnitPriceDisplay((prev) => prev.filter((_, i) => i !== index));
@@ -955,7 +971,18 @@ const OrderDetailPage = () => {
                             onBlur={() => {
                               const raw = quantityDisplay[idx] ?? String(line.quantity);
                               const parsed = parseFloat(raw);
-                              const num = Number.isFinite(parsed) && parsed >= 0 ? parsed : 1;
+                              let num = Number.isFinite(parsed) && parsed >= 0 ? parsed : 1;
+                              if (!isNew && order?.type === 'order' && line.id != null) {
+                                const billed = Number(line.quantity_billed ?? 0);
+                                if (billed > 0) {
+                                  const orig = order.lines.find((o) => o.id === line.id);
+                                  const origQty = orig != null ? Number(orig.quantity) : line.quantity;
+                                  const min = billed;
+                                  const max = origQty;
+                                  if (num < min) num = min;
+                                  if (num > max) num = max;
+                                }
+                              }
                               updateLine(idx, 'quantity', num);
                               setQuantityDisplay((prev) => {
                                 const next = [...prev];
@@ -1034,7 +1061,7 @@ const OrderDetailPage = () => {
                         </td>
                       )}
                       <td className="py-1.5 px-2 align-top">
-                        {!readOnly && (
+                        {!readOnly && Number(line.quantity_billed ?? 0) <= 0 && (
                           <button
                             type="button"
                             onClick={() => removeLine(idx)}

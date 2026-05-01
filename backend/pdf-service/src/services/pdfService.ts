@@ -1,7 +1,7 @@
 import PDFDocument from 'pdfkit';
 import { Response } from 'express';
 
-const COMPANY_NAME = process.env.COMPANY_NAME || '19th Chamber';
+const COMPANY_NAME = process.env.COMPANY_NAME || 'Zach Barbarich';
 const COMPANY_LOGO_URL = process.env.COMPANY_LOGO_URL || '';
 const COMPANY_ADDRESS = [
   process.env.COMPANY_ADDRESS_LINE1 || '106 Packer Street',
@@ -160,6 +160,17 @@ async function addCompanyHeader(doc: PDFDoc, startY: number): Promise<number> {
   return y;
 }
 
+const TABLE_CELL_PAD_X = 4;
+const TABLE_CELL_PAD_TOP = 5;
+const TABLE_CELL_PAD_BOTTOM = 5;
+const TABLE_ROW_MIN = 20;
+const TABLE_HEADER_MIN = 22;
+
+function cellInnerWidth(colWidth: number): number {
+  return Math.max(1, colWidth - 2 * TABLE_CELL_PAD_X);
+}
+
+/** Bordered table with row height driven by wrapped text (description column can grow). */
 function drawBorderedTable(
   doc: PDFDoc,
   startY: number,
@@ -167,26 +178,40 @@ function drawBorderedTable(
   rows: (string | number)[][],
   colWidths: number[]
 ): number {
-  const rowHeight = 20;
-  const headerHeight = 22;
   const left = PAGE_MARGIN;
   let y = startY;
 
   doc.fontSize(10).font('Helvetica-Bold');
+  let headerHeight = TABLE_HEADER_MIN;
+  for (let i = 0; i < headers.length; i++) {
+    const innerW = cellInnerWidth(colWidths[i]);
+    const textH = doc.heightOfString(String(headers[i]), { width: innerW });
+    headerHeight = Math.max(headerHeight, textH + TABLE_CELL_PAD_TOP + TABLE_CELL_PAD_BOTTOM + 2);
+  }
+
   let x = left;
   for (let i = 0; i < headers.length; i++) {
+    const innerW = cellInnerWidth(colWidths[i]);
     doc.rect(x, y, colWidths[i], headerHeight).stroke();
-    doc.text(String(headers[i]), x + 4, y + 6, { width: colWidths[i] - 8 });
+    doc.text(String(headers[i]), x + TABLE_CELL_PAD_X, y + TABLE_CELL_PAD_TOP, { width: innerW });
     x += colWidths[i];
   }
   y += headerHeight;
 
   doc.font('Helvetica');
   for (const row of rows) {
+    let rowHeight = TABLE_ROW_MIN;
+    for (let i = 0; i < row.length; i++) {
+      const innerW = cellInnerWidth(colWidths[i]);
+      const textH = doc.heightOfString(String(row[i]), { width: innerW });
+      rowHeight = Math.max(rowHeight, textH + TABLE_CELL_PAD_TOP + TABLE_CELL_PAD_BOTTOM);
+    }
+
     x = left;
     for (let i = 0; i < row.length; i++) {
+      const innerW = cellInnerWidth(colWidths[i]);
       doc.rect(x, y, colWidths[i], rowHeight).stroke();
-      doc.text(String(row[i]), x + 4, y + 5, { width: colWidths[i] - 8 });
+      doc.text(String(row[i]), x + TABLE_CELL_PAD_X, y + TABLE_CELL_PAD_TOP, { width: innerW });
       x += colWidths[i];
     }
     y += rowHeight;
