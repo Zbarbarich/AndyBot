@@ -1,0 +1,12 @@
+# Copy to deploy/Caddyfile on your server (not committed to git).
+# Replace yourdomain.com with your real domain.
+# Caddy will obtain and renew a Let's Encrypt certificate automatically.
+yourdomain.com, www.yourdomain.com {
+    encode gzip
+    handle /api/* {
+        reverse_proxy api-gateway:3000
+    }
+    handle {
+        reverse_proxy frontend:80
+    }
+}

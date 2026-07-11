@@ -5,7 +5,7 @@ Single-instance Docker Compose deployment with Caddy (HTTPS), PostgreSQL, and al
 ## Quick start
 
 1. Copy `deploy/.env.example` to `deploy/.env` and set `POSTGRES_USER`, `POSTGRES_PASSWORD`, `JWT_SECRET`, and optionally `POSTGRES_DB`, `JWT_EXPIRES_IN`, `CORS_ORIGIN` (your production URL, e.g. `https://yourdomain.com`), `COMPANY_NAME`, `COMPANY_LOGO_URL`.
-2. Replace `yourdomain.com` in `deploy/Caddyfile` with your real domain.
+2. Copy `deploy/Caddyfile.example` to `deploy/Caddyfile` and replace `yourdomain.com` with your real domain. `deploy/Caddyfile` is gitignored — the production file lives on the server only.
 3. **On a small instance (e.g. 1 GB RAM):** add swap before the first build so parallel builds don’t freeze (see [Build issues on small instances](#build-issues-on-small-instances)).
 4. Run database migrations once (see below) before or right after first `docker compose up`.
 5. From the **repo root**:
@@ -101,7 +101,25 @@ Run in order: **001** → **002** → **003** → **004** → **005** → **006*
 
 ## Caddyfile
 
-Edit `deploy/Caddyfile` and replace `yourdomain.com` with your domain. Caddy will obtain and renew a Let's Encrypt certificate automatically. Ports 80 and 443 must be open on the host.
+`deploy/Caddyfile.example` is the template in git. On each server:
+
+```bash
+cp deploy/Caddyfile.example deploy/Caddyfile
+# edit deploy/Caddyfile — set your real domain
+```
+
+`deploy/Caddyfile` is listed in `.gitignore` and is not committed. Caddy obtains and renews Let's Encrypt certificates automatically. Ports 80 and 443 must be open on the host.
+
+### VPS pre-flight (before first deploy after Caddyfile is untracked)
+
+SSH to the server **before** merging this change to `main`:
+
+```bash
+cd ~/theNineteenthChamber   # or your DEPLOY_PATH
+cp deploy/Caddyfile ~/andybot-Caddyfile.backup
+```
+
+GitHub Actions backs up and restores `deploy/Caddyfile` around `git reset --hard`. After deploy, confirm your site still loads over HTTPS.
 
 ## GitHub Actions
 

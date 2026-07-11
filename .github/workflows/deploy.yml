@@ -61,6 +61,11 @@ jobs:
             else
               cd ~/theNineteenthChamber
             fi
+            CADDY_BACKUP="${HOME}/andybot-Caddyfile.backup"
+            if [ -f deploy/Caddyfile ]; then
+              cp deploy/Caddyfile "$CADDY_BACKUP"
+              echo "Backed up deploy/Caddyfile to $CADDY_BACKUP"
+            fi
             echo "Deploying origin/${DEPLOY_GIT_REF} on VPS..."
             echo "GITHUB_REPO_SLUG=${GITHUB_REPO_SLUG:-<empty>}"
             echo "GH_DEPLOY_TOKEN length on remote: ${#GH_DEPLOY_TOKEN} (0 means secret missing or not forwarded)"
@@ -86,6 +91,10 @@ jobs:
             git reset --hard "origin/${DEPLOY_GIT_REF}"
             restore_origin
             trap - EXIT
+            if [ ! -f deploy/Caddyfile ] && [ -f "$CADDY_BACKUP" ]; then
+              cp "$CADDY_BACKUP" deploy/Caddyfile
+              echo "Restored deploy/Caddyfile from backup"
+            fi
             echo "Building from commit:"
             git log -1 --oneline
             git rev-parse HEAD
