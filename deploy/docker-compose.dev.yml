@@ -1,0 +1,32 @@
+# Local development Postgres only (not for production).
+# From repo root:
+#   docker compose -f deploy/docker-compose.dev.yml up -d
+#
+# App services connect with:
+#   DB_HOST=localhost
+#   DB_PORT=5432
+#   DB_NAME=the_nineteenth_chamber
+#   DB_USER=andybot
+#   DB_PASSWORD=andybot_dev_password
+#   DB_SSL=false
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: andybot
+      POSTGRES_PASSWORD: andybot_dev_password
+      POSTGRES_DB: the_nineteenth_chamber
+    volumes:
+      - andybot_pg_dev_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U andybot -d the_nineteenth_chamber"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  andybot_pg_dev_data:

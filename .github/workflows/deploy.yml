@@ -1,0 +1,109 @@
+# Deploy to Oracle (or other) VPS on push to main.
+# Build runs on the VPS to avoid a container registry.
+# Manual test: Actions → Deploy to VPS → Run workflow → pick branch + "Branch to deploy on VPS".
+# Required secrets: SSH_HOST, SSH_USER, SSH_PRIVATE_KEY
+# Optional: DEPLOY_PATH (absolute path on VPS). Default fallback remains the existing server clone path.
+
+name: Deploy to VPS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      deploy_ref:
+        description: Branch (or tag) on GitHub to deploy on the VPS — must exist on origin
+        required: true
+        default: main
+        type: string
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check deploy secrets
+        run: |
+          if [ -z "${{ secrets.SSH_HOST }}" ]; then
+            echo "::error::SSH_HOST secret is not set. Add it in repo Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+          if [ -z "${{ secrets.SSH_USER }}" ]; then
+            echo "::error::SSH_USER secret is not set. Add it in repo Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+          if [ -z "${{ secrets.SSH_PRIVATE_KEY }}" ]; then
+            echo "::error::SSH_PRIVATE_KEY secret is not set. Add it in repo Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+          echo "Deploy secrets present."
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          command_timeout: 60m
+          # Without this, env vars are NOT sent to the remote; DEPLOY_GIT_REF was empty (origin/).
+          envs: DEPLOY_PATH,DEPLOY_GIT_REF,GH_DEPLOY_TOKEN,GITHUB_REPO_SLUG
+          script: |
+            set -e
+            export GIT_TERMINAL_PROMPT=0
+            if [ -z "${DEPLOY_GIT_REF:-}" ]; then
+              echo "ERROR: DEPLOY_GIT_REF is empty. Check ssh-action with.envs includes DEPLOY_GIT_REF."
+              exit 1
+            fi
+            if [ -n "$DEPLOY_PATH" ]; then
+              cd "$DEPLOY_PATH"
+            else
+              cd ~/theNineteenthChamber
+            fi
+            CADDY_BACKUP="${HOME}/andybot-Caddyfile.backup"
+            if [ -f deploy/Caddyfile ]; then
+              cp deploy/Caddyfile "$CADDY_BACKUP"
+              echo "Backed up deploy/Caddyfile to $CADDY_BACKUP"
+            fi
+            echo "Deploying origin/${DEPLOY_GIT_REF} on VPS..."
+            echo "GITHUB_REPO_SLUG=${GITHUB_REPO_SLUG:-<empty>}"
+            echo "GH_DEPLOY_TOKEN length on remote: ${#GH_DEPLOY_TOKEN} (0 means secret missing or not forwarded)"
+            ORIGIN_URL="$(git remote get-url origin)"
+            echo "Saved origin URL pattern: ${ORIGIN_URL%%@*}..." # hide any embedded password
+            restore_origin() { git remote set-url origin "$ORIGIN_URL"; }
+            trap restore_origin EXIT
+            if [ -n "${GH_DEPLOY_TOKEN:-}" ] && [ -n "${GITHUB_REPO_SLUG:-}" ]; then
+              echo "Using GH_DEPLOY_TOKEN for this fetch only (origin restored after)."
+              git remote set-url origin "https://x-access-token:${GH_DEPLOY_TOKEN}@github.com/${GITHUB_REPO_SLUG}.git"
+            else
+              case "$ORIGIN_URL" in
+                https://github.com/*|https://*.github.com/*)
+                  echo "ERROR: VPS git remote is HTTPS (no stored GitHub login) but GH_DEPLOY_TOKEN is empty or GITHUB_REPO_SLUG missing."
+                  echo "Fix one of:"
+                  echo "  1) Repo Settings → Secrets → Actions → add GH_DEPLOY_TOKEN (fine-grained PAT: this repo, Contents Read-only)."
+                  echo "  2) On VPS: git remote set-url origin git@github.com:Zbarbarich/AndyBot.git + deploy key with read access."
+                  exit 1
+                  ;;
+              esac
+            fi
+            git fetch origin
+            git reset --hard "origin/${DEPLOY_GIT_REF}"
+            restore_origin
+            trap - EXIT
+            if [ ! -f deploy/Caddyfile ] && [ -f "$CADDY_BACKUP" ]; then
+              cp "$CADDY_BACKUP" deploy/Caddyfile
+              echo "Restored deploy/Caddyfile from backup"
+            fi
+            echo "Building from commit:"
+            git log -1 --oneline
+            git rev-parse HEAD
+            chmod +x deploy/build-sequential.sh deploy/prune-docker.sh
+            ./deploy/build-sequential.sh
+            docker compose -f deploy/docker-compose.yml --env-file deploy/.env restart caddy
+            ./deploy/prune-docker.sh
+        env:
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          DEPLOY_GIT_REF: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_ref || github.ref_name }}
+          GH_DEPLOY_TOKEN: ${{ secrets.GH_DEPLOY_TOKEN }}
+          GITHUB_REPO_SLUG: ${{ github.repository }}
