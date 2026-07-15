@@ -210,6 +210,16 @@ interface TicketRow {
   status: string;
   subject: string;
   customer_name?: string | null;
+  created_at?: string;
+  updated_at?: string;
+  update_count?: number;
+  last_activity_at?: string;
+}
+
+interface PurchaseOrderRow {
+  id: number;
+  status: string;
+  line_count?: number;
 }
 
 function trailingMonthKeys(count: number): string[] {
@@ -228,6 +238,8 @@ function toMonthKey(dateStr: string): string | null {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
+const STALE_TICKET_MS = 14 * 24 * 60 * 60 * 1000;
+
 async function dashboardSummary(req: AuthRequest, res: Response): Promise<void> {
   const authHeader = req.headers.authorization || '';
   const opts = { headers: { Authorization: authHeader } };
@@ -235,6 +247,7 @@ async function dashboardSummary(req: AuthRequest, res: Response): Promise<void> 
   const quoteUrl = (process.env.ORDER_SERVICE_URL || 'http://localhost:3005') + '/api/app/quotes';
   const invoiceUrl = (process.env.INVOICE_SERVICE_URL || 'http://localhost:3006') + '/api/app/invoices';
   const ticketUrl = (process.env.TICKET_SERVICE_URL || 'http://localhost:3004') + '/api/app/tickets';
+  const poUrl = (process.env.ORDER_SERVICE_URL || 'http://localhost:3005') + '/api/app/purchase-orders';
 
   const fetchJson = async <T>(url: string): Promise<T[]> => {
     try {
@@ -247,11 +260,21 @@ async function dashboardSummary(req: AuthRequest, res: Response): Promise<void> 
     }
   };
 
-  const [orders, quotes, invoices, tickets] = await Promise.all([
+  const [orders, quotes, invoices, tickets, purchaseOrders, heldDeposits] = await Promise.all([
     fetchJson<OrderRow>(orderUrl),
     fetchJson<OrderRow>(quoteUrl),
     fetchJson<InvoiceRow>(invoiceUrl),
     fetchJson<TicketRow>(ticketUrl),
+    fetchJson<PurchaseOrderRow>(poUrl),
+    (async () => {
+      try {
+        const r = await fetch((process.env.ORDER_SERVICE_URL || 'http://localhost:3005') + '/api/app/orders/deposits/held', opts);
+        if (!r.ok) return { total: 0, deposits: [] as Array<{ amount: string; paid_at: string }> };
+        return (await r.json()) as { total: number; deposits: Array<{ amount: string; paid_at: string }> };
+      } catch {
+        return { total: 0, deposits: [] as Array<{ amount: string; paid_at: string }> };
+      }
+    })(),
   ]);
 
   const openOrders = orders.filter((o) => o.type === 'order' && o.status !== 'closed').length;
@@ -263,6 +286,20 @@ async function dashboardSummary(req: AuthRequest, res: Response): Promise<void> 
     0,
   );
   const openTickets = tickets.filter((t) => t.status !== 'Closed').length;
+  const depositsHeld = Math.round(Number(heldDeposits.total || 0) * 100) / 100;
+
+  const openPos = purchaseOrders.filter((po) => String(po.status).toLowerCase() !== 'closed' && String(po.status).toLowerCase() !== 'cancelled');
+  const openPurchaseOrders = openPos.length;
+  const openPurchaseOrderItems = openPos.reduce((sum, po) => sum + Number(po.line_count ?? 0), 0);
+
+  const now = Date.now();
+  const staleTickets = tickets.filter((t) => {
+    if (t.status === 'Closed') return false;
+    const updateCount = Number(t.update_count ?? 0);
+    const last = new Date(t.last_activity_at || t.updated_at || t.created_at || 0).getTime();
+    if (Number.isNaN(last)) return updateCount === 0;
+    return updateCount === 0 || now - last > STALE_TICKET_MS;
+  }).length;
 
   const monthKeys = trailingMonthKeys(12);
   const revenueMap = new Map(monthKeys.map((m) => [m, 0]));
@@ -277,10 +314,23 @@ async function dashboardSummary(req: AuthRequest, res: Response): Promise<void> 
     }
   }
 
+  // Unapplied deposits count as cash/revenue in the month they were paid
+  for (const d of heldDeposits.deposits || []) {
+    const amt = Number(d.amount);
+    if (amt <= 0) continue;
+    const key = d.paid_at ? toMonthKey(d.paid_at) : null;
+    if (key && revenueMap.has(key)) {
+      revenueMap.set(key, (revenueMap.get(key) ?? 0) + amt);
+    }
+  }
+
   const revenueByMonth = monthKeys.map((month) => ({
     month,
     total: Math.round((revenueMap.get(month) ?? 0) * 100) / 100,
   }));
+
+  const thisMonthKey = monthKeys[monthKeys.length - 1];
+  const thisMonthRevenue = revenueByMonth.find((r) => r.month === thisMonthKey)?.total ?? 0;
 
   const recentOrders = orders
     .filter((o) => o.type === 'order')
@@ -299,7 +349,12 @@ async function dashboardSummary(req: AuthRequest, res: Response): Promise<void> 
     openQuotes,
     openInvoices,
     accountsReceivable: Math.round(accountsReceivable * 100) / 100,
+    depositsHeld,
     openTickets,
+    openPurchaseOrders,
+    openPurchaseOrderItems,
+    staleTickets,
+    thisMonthRevenue,
     revenueByMonth,
     recentOrders,
   });

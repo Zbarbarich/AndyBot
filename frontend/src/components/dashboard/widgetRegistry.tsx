@@ -60,6 +60,21 @@ export const widgetRegistry: WidgetDef[] = [
     enabled: true,
   },
   {
+    id: 'kpi-deposits',
+    component: () => (
+      <KpiCardWidget
+        title="Deposits"
+        valueKey="depositsHeld"
+        href="/orders"
+        formatValue={(v) =>
+          `$${Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+        }
+      />
+    ),
+    gridClass: '',
+    enabled: true,
+  },
+  {
     id: 'recent-orders',
     component: OpenOrdersWidget,
     gridClass: 'sm:col-span-2 xl:col-span-2',

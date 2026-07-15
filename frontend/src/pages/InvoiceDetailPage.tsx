@@ -11,6 +11,7 @@ import DocumentFieldGrid, { DocumentFieldSpan } from '../components/document/Doc
 import DocumentTotalsPanel from '../components/document/DocumentTotalsPanel';
 import DocumentStatusBadge from '../components/document/DocumentStatusBadge';
 import { useDetailFetch } from '../hooks/useDetailFetch';
+import { useToast } from '../context/ToastContext';
 import { apiBase } from '../api/config';
 import { formatDate } from '../utils/formatDate';
 
@@ -52,6 +53,7 @@ interface InvoiceDetail {
 const InvoiceDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { success, error: toastError } = useToast();
   const invoiceId = id ? parseInt(id, 10) : NaN;
   const validId = !isNaN(invoiceId);
   const url = validId ? `${INVOICES_API}/${invoiceId}` : null;
@@ -91,9 +93,12 @@ const InvoiceDetailPage = () => {
       setPaymentAmount('');
       setPaymentReference('');
       setShowPaymentModal(false);
+      success('Payment recorded');
       await refetch();
     } catch (e) {
-      setPaymentError(e instanceof Error ? e.message : 'Failed to record payment');
+      const msg = e instanceof Error ? e.message : 'Failed to record payment';
+      setPaymentError(msg);
+      toastError(msg);
     } finally {
       setSubmittingPayment(false);
     }
@@ -200,11 +205,11 @@ const InvoiceDetailPage = () => {
           </DocumentFieldSpan>
           <DocumentFieldSpan span={4}>
             <label className="block text-sm font-medium text-text-muted mb-1">Invoice date</label>
-            <p className="text-text font-mono text-sm">{invoice.invoice_date}</p>
+            <p className="text-text font-mono text-sm">{formatDate(invoice.invoice_date)}</p>
           </DocumentFieldSpan>
           <DocumentFieldSpan span={4}>
             <label className="block text-sm font-medium text-text-muted mb-1">Due date</label>
-            <p className="text-text font-mono text-sm">{invoice.due_date ?? '—'}</p>
+            <p className="text-text font-mono text-sm">{formatDate(invoice.due_date)}</p>
           </DocumentFieldSpan>
         </DocumentFieldGrid>
       </FormSection>
@@ -259,15 +264,24 @@ const InvoiceDetailPage = () => {
           <div className="mt-4 pt-3 border-t border-border">
             <h3 className="text-sm font-medium text-text-muted mb-2">Payment history</h3>
             <ul className="space-y-2 text-sm text-text">
-              {invoice.payments.map((p) => (
+              {invoice.payments.map((p) => {
+                const isDeposit =
+                  (p.reference != null && p.reference.toLowerCase() === 'deposit') ||
+                  (p.payment_method != null && p.payment_method.toLowerCase().includes('deposit'));
+                return (
                 <li key={p.id} className="line-item-card py-2 px-3">
                   <div className="flex flex-wrap gap-x-4 gap-y-1">
                     <span className="font-mono">{formatDate(p.paid_at)}</span>
                     <span className="font-mono font-medium">{Number(p.amount).toFixed(2)}</span>
-                    <span className="text-text-muted">{p.payment_method ?? '—'}{p.reference ? ` · ${p.reference}` : ''}</span>
+                    <span className="text-text-muted">
+                      {isDeposit ? 'Deposit' : (p.payment_method ?? '—')}
+                      {p.reference && !isDeposit ? ` · ${p.reference}` : ''}
+                      {isDeposit && p.reference && p.reference.toLowerCase() !== 'deposit' ? ` · ${p.reference}` : ''}
+                    </span>
                   </div>
                 </li>
-              ))}
+                );
+              })}
             </ul>
           </div>
         )}

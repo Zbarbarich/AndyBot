@@ -17,6 +17,13 @@ const quoteOrderQueries = {
     WHERE l.quote_order_id = $1
     ORDER BY l.sort_order ASC, l.id ASC
   `,
+
+  getDepositsByOrderId: `
+    SELECT d.amount, d.payment_method, d.paid_at, d.reference, d.applied_to_invoice_id
+    FROM order_deposits d
+    WHERE d.quote_order_id = $1
+    ORDER BY d.paid_at ASC, d.id ASC
+  `,
 };
 
 export default quoteOrderQueries;

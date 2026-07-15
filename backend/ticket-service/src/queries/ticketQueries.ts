@@ -1,6 +1,14 @@
 const TICKET_COLS = `
   t.id, t.creation_date, t.subject, t.customer_id, t.category, t.description, t.email, t.priority, t.status,
-  t.created_at, t.updated_at, c.name AS customer_name, c.email AS customer_email
+  t.created_at, t.updated_at, c.name AS customer_name, c.email AS customer_email,
+  COALESCE((
+    SELECT COUNT(*)::int FROM ticket_resolution_updates ru WHERE ru.ticket_id = t.id
+  ), 0) AS update_count,
+  GREATEST(
+    t.created_at,
+    t.updated_at,
+    COALESCE((SELECT MAX(ru.created_at) FROM ticket_resolution_updates ru WHERE ru.ticket_id = t.id), t.created_at)
+  ) AS last_activity_at
 `;
 
 const ticketQueries = {
@@ -142,6 +150,8 @@ const ticketQueries = {
     VALUES ($1, $2)
     RETURNING id, ticket_id, content, created_at
   `,
+
+  touchUpdatedAt: `UPDATE tickets SET updated_at = NOW() WHERE id = $1`,
 };
 
 export default ticketQueries;

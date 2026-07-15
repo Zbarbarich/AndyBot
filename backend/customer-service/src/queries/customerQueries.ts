@@ -89,15 +89,14 @@ const customerQueries = {
     ORDER BY ip.paid_at DESC
   `,
 
-  /** Order deposits for customer (for payment history). */
+  /** Unapplied order deposits only (applied ones appear as invoice payments). */
   paymentHistoryOrderDeposits: `
     SELECT d.id, 'deposit' AS payment_type, d.quote_order_id AS order_id, d.amount, d.payment_method, d.paid_at, d.reference,
            d.applied_to_invoice_id, q.document_number AS order_document_number,
-           ai.invoice_number AS applied_invoice_number
+           NULL::varchar AS applied_invoice_number
     FROM order_deposits d
     JOIN quotes_orders q ON q.id = d.quote_order_id
-    LEFT JOIN invoices ai ON ai.id = d.applied_to_invoice_id
-    WHERE q.customer_id = $1
+    WHERE q.customer_id = $1 AND d.applied_to_invoice_id IS NULL
     ORDER BY d.paid_at DESC
   `,
 };

@@ -13,5 +13,6 @@ COPY package*.json ./
 RUN --mount=type=cache,target=/root/.npm \
     npm ci --omit=dev
 COPY --from=builder /app/dist ./dist
+COPY assets ./assets
 EXPOSE 3007
 CMD ["node", "dist/index.js"]

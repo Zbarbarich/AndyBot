@@ -1,4 +1,5 @@
 import { ReactNode } from 'react';
+import { useScrollFadeClass } from '../hooks/useScrollFadeClass';
 
 interface ResponsiveEntityListProps<T> {
   items: T[];
@@ -17,6 +18,8 @@ function ResponsiveEntityList<T>({
   loading = false,
   getKey,
 }: ResponsiveEntityListProps<T>) {
+  const onScroll = useScrollFadeClass();
+
   if (loading) {
     return (
       <div className="glass-card overflow-hidden">
@@ -40,7 +43,7 @@ function ResponsiveEntityList<T>({
           <div key={getKey(item)}>{renderCard(item)}</div>
         ))}
       </div>
-      <div className="hidden md:block table-scroll border-0 rounded-none">
+      <div className="hidden md:block table-scroll border-0 rounded-none" onScroll={onScroll}>
         {renderTable()}
       </div>
     </div>

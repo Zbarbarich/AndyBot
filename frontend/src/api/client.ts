@@ -38,8 +38,11 @@ export async function authFetch(
   init?: AuthFetchOptions
 ): Promise<Response> {
   const key = getCacheKey(input, init);
+  // Preferences must never use the short GET dedupe cache — stale prefs after PATCH.
+  const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+  const skipDedupe = url.includes('/me/preferences');
   const now = Date.now();
-  if (key) {
+  if (key && !skipDedupe) {
     const entry = getCache.get(key);
     if (entry && now - entry.ts < DEDUPE_WINDOW_MS) {
       const res = await entry.promise;
@@ -55,7 +58,7 @@ export async function authFetch(
     return res;
   });
 
-  if (key) {
+  if (key && !skipDedupe) {
     getCache.set(key, { promise, ts: now });
     promise.finally(() => {
       setTimeout(() => getCache.delete(key), DEDUPE_WINDOW_MS);

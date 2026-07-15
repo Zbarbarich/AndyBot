@@ -5,6 +5,8 @@ import { formatDate } from '../utils/formatDate';
 import { BackArrow } from '../components/BackArrow';
 import ListCardRow from '../components/ListCardRow';
 import ResponsiveEntityList from '../components/ResponsiveEntityList';
+import { useConfirm } from '../components/GlassConfirmDialog';
+import { useToast } from '../context/ToastContext';
 import { apiBase } from '../api/config';
 
 const CUSTOMERS_API = `${apiBase}/api/app/customers`;
@@ -63,6 +65,8 @@ const pillTabClass = (active: boolean) =>
 const CustomerDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { success, error: toastError } = useToast();
+  const { confirm } = useConfirm();
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [openTickets, setOpenTickets] = useState<Ticket[]>([]);
   const [closedTickets, setClosedTickets] = useState<Ticket[]>([]);
@@ -183,14 +187,18 @@ const CustomerDetailPage = () => {
   };
 
   const handleDelete = async () => {
-    if (!customer || !window.confirm('Delete this customer?')) return;
+    if (!customer) return;
+    if (!(await confirm({ message: 'Delete this customer?', danger: true }))) return;
     setError('');
     try {
       const res = await authFetch(`${CUSTOMERS_API}/${customer.id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error('Delete failed');
+      success('Customer deleted');
       navigate('/customers');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Delete failed');
+      const msg = e instanceof Error ? e.message : 'Delete failed';
+      setError(msg);
+      toastError(msg);
     }
   };
 

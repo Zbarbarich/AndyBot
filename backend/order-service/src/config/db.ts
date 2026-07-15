@@ -44,4 +44,5 @@ pool.connect((err, client, release) => {
 
 export const query = (text: string, params?: unknown[]) =>
   pool.query(text, params as never);
+export const getClient = () => pool.connect();
 export { pool };

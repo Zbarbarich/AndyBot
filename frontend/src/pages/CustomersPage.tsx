@@ -5,6 +5,7 @@ import { authFetch } from '../api/client';
 import { apiBase } from '../api/config';
 import { ErrorBanner } from '../components/ErrorBanner';
 import ListCardRow from '../components/ListCardRow';
+import ResizableTable from '../components/ResizableTable';
 import { ListPageToolbar } from '../components/MobilePageTitle';
 
 const API_BASE = `${apiBase}/api/app/customers`;
@@ -135,22 +136,23 @@ const CustomersPage = () => {
                 );
               })}
             </div>
-            <div className="hidden md:block table-scroll border-0 rounded-none">
-              <table>
-                <thead>
-                  <tr>
-                    <th className="col-id">ID</th>
-                    <th>Name</th>
-                    <th>Email</th>
-                    <th>Phone</th>
-                    <th className="col-status">Open balances</th>
-                    <th className="col-status">Open orders</th>
-                    <th className="col-status">Open invoices</th>
-                    <th className="col-status">Open POs</th>
-                    <th className="col-status">Email notif.</th>
-                    <th className="col-status">Text notif.</th>
-                  </tr>
-                </thead>
+            <div className="hidden md:block">
+              <ResizableTable
+                tableId="customers"
+                className="border-0 rounded-none"
+                columns={[
+                  { key: 'id', header: 'ID', className: 'col-id' },
+                  { key: 'name', header: 'Name' },
+                  { key: 'email', header: 'Email' },
+                  { key: 'phone', header: 'Phone' },
+                  { key: 'balances', header: 'Open balances', className: 'col-status' },
+                  { key: 'orders', header: 'Open orders', className: 'col-status' },
+                  { key: 'invoices', header: 'Open invoices', className: 'col-status' },
+                  { key: 'pos', header: 'Open POs', className: 'col-status' },
+                  { key: 'emailNotif', header: 'Email notif.', className: 'col-status' },
+                  { key: 'textNotif', header: 'Text notif.', className: 'col-status' },
+                ]}
+              >
                 <tbody className="text-text">
                   {customers.map((c) => (
                     <tr
@@ -173,7 +175,7 @@ const CustomersPage = () => {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </ResizableTable>
             </div>
           </>
         )}

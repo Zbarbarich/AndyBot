@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { BackArrow } from '../components/BackArrow';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { LineItemEditor } from '../components/LineItemEditor';
+import ResizableTable from '../components/ResizableTable';
 import { authFetch } from '../api/client';
 import { apiBase } from '../api/config';
 
@@ -45,6 +46,7 @@ const BillingPage = () => {
   const [additionalShipping, setAdditionalShipping] = useState('');
   /** Per-line quantity to invoice (for billable lines). Key = line id, value = qty to bill. */
   const [billableQty, setBillableQty] = useState<Record<number, number>>({});
+  const [depositsTotal, setDepositsTotal] = useState(0);
 
   const fetchOrder = useCallback(async () => {
     if (!id) return;
@@ -66,6 +68,20 @@ const BillingPage = () => {
       }
       const data = await res.json();
       setOrder(data);
+      try {
+        const depRes = await authFetch(`${ORDERS_API}/${orderId}/deposits`);
+        if (depRes.ok) {
+          const deposits: Array<{ amount: number; applied_to_invoice_id: number | null }> = await depRes.json();
+          const total = deposits
+            .filter((d) => d.applied_to_invoice_id == null)
+            .reduce((s, d) => s + Number(d.amount), 0);
+          setDepositsTotal(total);
+        } else {
+          setDepositsTotal(0);
+        }
+      } catch {
+        setDepositsTotal(0);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load order');
     } finally {
@@ -200,76 +216,82 @@ const BillingPage = () => {
         <span className="text-text font-medium">Billing – Order {order.document_number}</span>
       </div>
       <ErrorBanner message={error} />
+      {depositsTotal > 0 && (
+        <div className="mb-4 glass-panel px-4 py-3 rounded-xl text-sm text-text border border-glass">
+          Deposits: ${depositsTotal.toFixed(2)} — will apply when this invoice is created.
+        </div>
+      )}
       <div className="mb-4 p-4 rounded-xl bg-surface border border-border text-text text-sm">
         Mark lines as <strong>Unbilled</strong> (pending) or <strong>Billed</strong> (billable). Invoiced lines cannot be changed. Then create an invoice from the billable lines.
       </div>
       <LineItemEditor
         table={
-      <table>
-          <thead>
-            <tr>
-              <th>Item / Description</th>
-              <th>Qty</th>
-              <th>Unit price</th>
-              <th>Extended</th>
-              <th>Billing status</th>
-              <th>Billable qty</th>
-            </tr>
-          </thead>
-          <tbody className="text-text">
-            {order.lines.map((line) => {
-              const qty = Number(line.quantity);
-              const billed = Number(line.quantity_billed ?? 0);
-              const remaining = Math.max(0, qty - billed);
-              const toBill = billableQty[line.id] ?? remaining;
-              return (
-                <tr key={line.id}>
-                  <td className="min-w-[160px]">
-                    {line.item_sku && line.item_name ? `${line.item_sku} – ${line.item_name}` : (line.description || '—')}
-                  </td>
-                  <td>{qty}</td>
-                  <td>{Number(line.unit_price).toFixed(2)}</td>
-                  <td className="whitespace-nowrap">{(qty * Number(line.unit_price)).toFixed(2)}</td>
-                  <td>
-                    {line.billing_status === 'invoiced' ? (
-                      <span className="text-text-muted">Invoiced</span>
-                    ) : (
-                      <select
-                        value={line.billing_status}
-                        onChange={(e) => updateLineBillingStatus(line.id, e.target.value as 'pending' | 'billable')}
-                        disabled={patchingLineId === line.id}
-                        className="input-field w-full max-w-[120px]"
-                      >
-                        <option value="pending">Unbilled</option>
-                        <option value="billable">Billed</option>
-                      </select>
-                    )}
-                  </td>
-                  <td>
-                    {line.billing_status === 'invoiced' ? (
-                      <span className="text-text-muted">—</span>
-                    ) : line.billing_status === 'billable' && remaining > 0 ? (
-                      <input
-                        type="number"
-                        min={1}
-                        max={remaining}
-                        step={1}
-                        value={toBill}
-                        onChange={(e) => {
-                          const v = e.target.value === '' ? remaining : Math.min(remaining, Math.max(1, parseFloat(e.target.value) || 0));
-                          setBillableQty((prev) => ({ ...prev, [line.id]: v }));
-                        }}
-                        className="input-field w-20 min-h-0 py-1.5 px-2 text-right"
-                      />
-                    ) : (
-                      <span className="text-text-muted">—</span>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+          <ResizableTable
+            tableId="billing-lines"
+            embedded
+            columns={[
+              { key: 'item', header: 'Item / Description' },
+              { key: 'qty', header: 'Qty' },
+              { key: 'unitPrice', header: 'Unit price' },
+              { key: 'extended', header: 'Extended' },
+              { key: 'billingStatus', header: 'Billing status' },
+              { key: 'billableQty', header: 'Billable qty' },
+            ]}
+          >
+            <tbody className="text-text">
+              {order.lines.map((line) => {
+                const qty = Number(line.quantity);
+                const billed = Number(line.quantity_billed ?? 0);
+                const remaining = Math.max(0, qty - billed);
+                const toBill = billableQty[line.id] ?? remaining;
+                return (
+                  <tr key={line.id}>
+                    <td className="min-w-[160px]">
+                      {line.item_sku && line.item_name ? `${line.item_sku} – ${line.item_name}` : (line.description || '—')}
+                    </td>
+                    <td>{qty}</td>
+                    <td>{Number(line.unit_price).toFixed(2)}</td>
+                    <td className="whitespace-nowrap">{(qty * Number(line.unit_price)).toFixed(2)}</td>
+                    <td>
+                      {line.billing_status === 'invoiced' ? (
+                        <span className="text-text-muted">Invoiced</span>
+                      ) : (
+                        <select
+                          value={line.billing_status}
+                          onChange={(e) => updateLineBillingStatus(line.id, e.target.value as 'pending' | 'billable')}
+                          disabled={patchingLineId === line.id}
+                          className="input-field w-full max-w-[120px]"
+                        >
+                          <option value="pending">Unbilled</option>
+                          <option value="billable">Billed</option>
+                        </select>
+                      )}
+                    </td>
+                    <td>
+                      {line.billing_status === 'invoiced' ? (
+                        <span className="text-text-muted">—</span>
+                      ) : line.billing_status === 'billable' && remaining > 0 ? (
+                        <input
+                          type="number"
+                          min={1}
+                          max={remaining}
+                          step={1}
+                          value={toBill}
+                          onChange={(e) => {
+                            const v = e.target.value === '' ? remaining : Math.min(remaining, Math.max(1, parseFloat(e.target.value) || 0));
+                            setBillableQty((prev) => ({ ...prev, [line.id]: v }));
+                          }}
+                          className="input-field w-20 min-h-0 py-1.5 px-2 text-right"
+                        />
+                      ) : (
+                        <span className="text-text-muted">—</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </ResizableTable>
         }
       />
       {hasBillableLines && (

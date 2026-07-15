@@ -7,6 +7,7 @@ import StickyFormActions from '../components/StickyFormActions';
 import TicketFormFields, { TicketFormState } from '../components/TicketFormFields';
 import DocumentPageShell from '../components/document/DocumentPageShell';
 import DocumentHeader from '../components/document/DocumentHeader';
+import { useToast } from '../context/ToastContext';
 import { apiBase } from '../api/config';
 
 const API_BASE = `${apiBase}/api/app/tickets`;
@@ -20,6 +21,7 @@ interface Customer {
 
 const TicketFormPage = () => {
   const navigate = useNavigate();
+  const { success, error: toastError } = useToast();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [error, setError] = useState('');
   const [form, setForm] = useState<TicketFormState>({
@@ -68,9 +70,12 @@ const TicketFormPage = () => {
       });
       if (!res.ok) throw new Error('Request failed');
       const data = await res.json();
+      success('Ticket created');
       navigate(`/tickets/${data.id}`, { replace: true });
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Request failed');
+      const msg = e instanceof Error ? e.message : 'Request failed';
+      setError(msg);
+      toastError(msg);
     }
   };
 

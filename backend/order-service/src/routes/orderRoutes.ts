@@ -7,6 +7,7 @@ const router = Router();
 
 router.get('/', quoteOrderController.listOrders);
 router.get('/search', quoteOrderController.search);
+router.get('/deposits/held', depositController.listUnapplied);
 router.patch('/:orderId/lines/:lineId', quoteOrderController.patchLineBillingStatus);
 router.get('/:orderId/deposits', depositController.list);
 router.post('/:orderId/deposits', depositController.create);

@@ -5,9 +5,19 @@ import { useDashboardSummary } from '../useDashboardSummary';
 
 interface KpiCardWidgetProps {
   title: string;
-  valueKey: 'openOrders' | 'openQuotes' | 'openInvoices' | 'openTickets';
+  valueKey:
+    | 'openOrders'
+    | 'openQuotes'
+    | 'openInvoices'
+    | 'openTickets'
+    | 'depositsHeld'
+    | 'accountsReceivable'
+    | 'thisMonthRevenue'
+    | 'openPurchaseOrders'
+    | 'staleTickets';
   href: string;
   subtitle?: (summary: NonNullable<ReturnType<typeof useDashboardSummary>['summary']>) => string;
+  formatValue?: (value: number) => string;
 }
 
 function AnimatedNumber({ value }: { value: number }) {
@@ -33,15 +43,16 @@ function AnimatedNumber({ value }: { value: number }) {
   return <>{Math.round(display)}</>;
 }
 
-const KpiCardWidget = ({ title, valueKey, href, subtitle }: KpiCardWidgetProps) => {
+const KpiCardWidget = ({ title, valueKey, href, subtitle, formatValue }: KpiCardWidgetProps) => {
   const { summary, loading, error } = useDashboardSummary();
   const value = summary?.[valueKey] ?? 0;
+  const displayCurrency = formatValue != null;
 
   return (
     <DashboardWidget title={title} loading={loading} error={error} className="h-full">
       <Link to={href} className="group flex flex-col flex-1 no-underline">
         <p className="text-3xl sm:text-4xl font-bold text-text tabular-nums group-hover:text-primary transition-colors">
-          <AnimatedNumber value={value} />
+          {displayCurrency ? formatValue(Number(value)) : <AnimatedNumber value={Number(value)} />}
         </p>
         {subtitle && summary && (
           <p className="text-xs text-text-muted mt-2">{subtitle(summary)}</p>

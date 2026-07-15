@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { authFetch } from '../api/client';
 import { BackArrow } from '../components/BackArrow';
+import { useConfirm } from '../components/GlassConfirmDialog';
+import { useToast } from '../context/ToastContext';
 import { apiBase } from '../api/config';
 
 const API_BASE = `${apiBase}/api/app/items`;
@@ -24,6 +26,8 @@ interface Item {
 const ItemDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { success, error: toastError } = useToast();
+  const { confirm } = useConfirm();
   const [item, setItem] = useState<Item | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -47,14 +51,18 @@ const ItemDetailPage = () => {
   }, [id]);
 
   const handleDelete = async () => {
-    if (!item || !window.confirm('Delete this item?')) return;
+    if (!item) return;
+    if (!(await confirm({ message: 'Delete this item?', danger: true }))) return;
     setError('');
     try {
       const res = await authFetch(`${API_BASE}/${item.id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error('Delete failed');
+      success('Item deleted');
       navigate('/items');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Delete failed');
+      const msg = e instanceof Error ? e.message : 'Delete failed';
+      setError(msg);
+      toastError(msg);
     }
   };
 

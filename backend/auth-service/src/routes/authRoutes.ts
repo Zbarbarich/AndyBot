@@ -13,6 +13,8 @@ router.use((req, res, next) => {
 // Public auth routes
 router.post("/login", authController.login);
 router.post("/validate", verifyUserContext, authController.validateUser);
+router.get("/me/preferences", verifyUserContext, authController.getMyPreferences);
+router.patch("/me/preferences", verifyUserContext, authController.patchMyPreferences);
 
 // Protected user management routes
 router.get("/users", verifyUserContext, isAdmin, authController.getAllUsers);

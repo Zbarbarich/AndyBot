@@ -7,6 +7,7 @@ import StickyFormActions from '../components/StickyFormActions';
 import TicketFormFields, { TICKET_STATUSES, TicketFormState } from '../components/TicketFormFields';
 import DocumentPageShell from '../components/document/DocumentPageShell';
 import DocumentHeader from '../components/document/DocumentHeader';
+import { useToast } from '../context/ToastContext';
 import { apiBase } from '../api/config';
 
 const API_BASE = `${apiBase}/api/app/tickets`;
@@ -21,6 +22,7 @@ interface Customer {
 const TicketEditPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { success, error: toastError } = useToast();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -98,9 +100,12 @@ const TicketEditPage = () => {
         }),
       });
       if (!res.ok) throw new Error('Update failed');
+      success('Ticket saved');
       navigate(`/tickets/${id}`, { replace: true });
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Update failed');
+      const msg = e instanceof Error ? e.message : 'Update failed';
+      setError(msg);
+      toastError(msg);
     }
   };
 

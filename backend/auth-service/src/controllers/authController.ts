@@ -267,6 +267,57 @@ export const authController = {
       }
     }
   },
-};
 
+  async getMyPreferences(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const userID = req.user?.userID;
+      if (userID == null) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+      const result = await pool.query(queries.getPreferences, [userID]);
+      if (result.rows.length === 0) {
+        res.status(404).json({ error: "User not found" });
+        return;
+      }
+      res.json(result.rows[0].ui_preferences || {});
+    } catch (e) {
+      console.error("getMyPreferences", e);
+      res.status(500).json({ error: "Failed to load preferences" });
+    }
+  },
+
+  async patchMyPreferences(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const userID = req.user?.userID;
+      if (userID == null) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+      const body = req.body;
+      if (body == null || typeof body !== "object" || Array.isArray(body)) {
+        res.status(400).json({ error: "Preferences must be a JSON object" });
+        return;
+      }
+      const currentResult = await pool.query(queries.getPreferences, [userID]);
+      if (currentResult.rows.length === 0) {
+        res.status(404).json({ error: "User not found" });
+        return;
+      }
+      const current = (currentResult.rows[0].ui_preferences || {}) as Record<string, unknown>;
+      const next: Record<string, unknown> = { ...current, ...body };
+      if (body.tableColumns && typeof body.tableColumns === "object") {
+        next.tableColumns = {
+          ...((current.tableColumns as Record<string, unknown>) || {}),
+          ...(body.tableColumns as Record<string, unknown>),
+        };
+      }
+      const result = await pool.query(queries.setPreferences, [userID, JSON.stringify(next)]);
+      res.json(result.rows[0].ui_preferences || {});
+    } catch (e) {
+      console.error("patchMyPreferences", e);
+      res.status(500).json({ error: "Failed to save preferences" });
+    }
+  },
+};
 export default authController;

@@ -9,6 +9,8 @@ import DocumentPageShell from '../components/document/DocumentPageShell';
 import DocumentHeader from '../components/document/DocumentHeader';
 import DocumentToolbar from '../components/document/DocumentToolbar';
 import DocumentStatusBadge from '../components/document/DocumentStatusBadge';
+import { useConfirm } from '../components/GlassConfirmDialog';
+import { useToast } from '../context/ToastContext';
 import { apiBase } from '../api/config';
 import { formatDate } from '../utils/formatDate';
 
@@ -64,6 +66,8 @@ interface Customer {
 const TicketDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { success, error: toastError } = useToast();
+  const { confirm } = useConfirm();
   const [ticket, setTicket] = useState<Ticket | null>(null);
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [loading, setLoading] = useState(true);
@@ -180,14 +184,18 @@ const TicketDetailPage = () => {
   };
 
   const handleDeleteTicket = async () => {
-    if (!ticket || !window.confirm('Delete this ticket?')) return;
+    if (!ticket) return;
+    if (!(await confirm({ message: 'Delete this ticket?', danger: true }))) return;
     setError('');
     try {
       const res = await authFetch(`${TICKETS_API}/${ticket.id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error('Delete failed');
+      success('Ticket deleted');
       navigate('/tickets');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Delete failed');
+      const msg = e instanceof Error ? e.message : 'Delete failed';
+      setError(msg);
+      toastError(msg);
     }
   };
 

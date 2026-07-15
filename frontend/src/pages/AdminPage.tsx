@@ -5,7 +5,10 @@ import { authFetch } from '../api/client';
 import { apiBase } from '../api/config';
 import { ErrorBanner } from '../components/ErrorBanner';
 import ListCardRow from '../components/ListCardRow';
+import ResizableTable from '../components/ResizableTable';
 import { ListPageToolbar } from '../components/MobilePageTitle';
+import { useConfirm } from '../components/GlassConfirmDialog';
+import { useToast } from '../context/ToastContext';
 
 const AUTH_BASE = `${apiBase}/api/auth`;
 
@@ -18,6 +21,8 @@ interface User {
 
 const AdminPage = () => {
   const navigate = useNavigate();
+  const { success, error: toastError } = useToast();
+  const { confirm } = useConfirm();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -79,7 +84,7 @@ const AdminPage = () => {
   };
 
   const handleDeleteUser = async (userID: number) => {
-    if (!window.confirm('Delete this user? This cannot be undone.')) return;
+    if (!(await confirm({ message: 'Delete this user? This cannot be undone.', danger: true }))) return;
     setError('');
     try {
       const res = await authFetch(`${AUTH_BASE}/users/${userID}`, { method: 'DELETE' });
@@ -88,9 +93,12 @@ const AdminPage = () => {
         throw new Error(data.error || 'Delete failed');
       }
       setEditingUser(null);
+      success('User deleted');
       await fetchUsers();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Delete failed');
+      const msg = e instanceof Error ? e.message : 'Delete failed';
+      setError(msg);
+      toastError(msg);
     }
   };
 
@@ -122,17 +130,18 @@ const AdminPage = () => {
                 />
               ))}
             </div>
-            <div className="hidden md:block table-scroll border-0 rounded-none">
-              <table>
-                <thead>
-                  <tr>
-                    <th className="col-id">ID</th>
-                    <th>User name</th>
-                    <th>Email</th>
-                    <th className="col-status">Role</th>
-                    <th></th>
-                  </tr>
-                </thead>
+            <div className="hidden md:block">
+              <ResizableTable
+                tableId="admin-users"
+                className="border-0 rounded-none"
+                columns={[
+                  { key: 'id', header: 'ID', className: 'col-id' },
+                  { key: 'userName', header: 'User name' },
+                  { key: 'email', header: 'Email' },
+                  { key: 'role', header: 'Role', className: 'col-status' },
+                  { key: 'actions', header: '' },
+                ]}
+              >
                 <tbody className="text-text">
                   {users.map((u) => (
                     <tr key={u.userID}>
@@ -148,7 +157,7 @@ const AdminPage = () => {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </ResizableTable>
             </div>
           </>
         )}

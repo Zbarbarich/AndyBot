@@ -4,8 +4,10 @@ import { Plus } from 'lucide-react';
 import { useListFetch } from '../hooks/useListFetch';
 import { ErrorBanner } from '../components/ErrorBanner';
 import ListCardRow from '../components/ListCardRow';
+import ResizableTable from '../components/ResizableTable';
 import { apiBase } from '../api/config';
 import { ListPageToolbar } from '../components/MobilePageTitle';
+import { formatDate } from '../utils/formatDate';
 
 const API_BASE = `${apiBase}/api/app/invoices`;
 
@@ -89,40 +91,41 @@ const InvoicesPage = () => {
                     <>
                       <span>Order {inv.order_document_number}</span>
                       <span>${Number(inv.total).toFixed(2)}</span>
-                      <span>{inv.invoice_date}</span>
+                      <span>{formatDate(inv.invoice_date)}</span>
                     </>
                   }
                   onClick={() => navigate(`/invoices/${inv.id}`)}
                 />
               ))}
             </div>
-            <div className="hidden md:block table-scroll table-scroll-fit border-0 rounded-none">
-            <table>
-              <thead>
-                <tr>
-                  <th className="col-doc">Invoice #</th>
-                  <th className="col-doc">Order #</th>
-                  <th className="col-customer">Customer</th>
-                  <th className="col-amount">Total</th>
-                  <th className="col-date">Date</th>
-                </tr>
-              </thead>
-              <tbody className="text-text">
-                {invoices.map((inv) => (
-                  <tr
-                    key={inv.id}
-                    className="cursor-pointer hover:bg-surface-elevated/50 active:bg-surface-elevated/70"
-                    onClick={() => navigate(`/invoices/${inv.id}`)}
-                  >
-                    <td className="col-doc font-mono font-medium truncate" title={inv.invoice_number}>{inv.invoice_number}</td>
-                    <td className="col-doc font-mono truncate" title={inv.order_document_number}>{inv.order_document_number}</td>
-                    <td className="col-customer truncate" title={inv.customer_name}>{inv.customer_name}</td>
-                    <td className="col-amount whitespace-nowrap">{Number(inv.total).toFixed(2)}</td>
-                    <td className="col-date whitespace-nowrap">{inv.invoice_date}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div className="hidden md:block">
+              <ResizableTable
+                tableId="invoices"
+                className="table-scroll-fit border-0 rounded-none"
+                columns={[
+                  { key: 'invoice', header: 'Invoice #', className: 'col-doc' },
+                  { key: 'order', header: 'Order #', className: 'col-doc' },
+                  { key: 'customer', header: 'Customer', className: 'col-customer' },
+                  { key: 'total', header: 'Total', className: 'col-amount' },
+                  { key: 'date', header: 'Date', className: 'col-date' },
+                ]}
+              >
+                <tbody className="text-text">
+                  {invoices.map((inv) => (
+                    <tr
+                      key={inv.id}
+                      className="cursor-pointer hover:bg-surface-elevated/50 active:bg-surface-elevated/70"
+                      onClick={() => navigate(`/invoices/${inv.id}`)}
+                    >
+                      <td className="col-doc font-mono font-medium truncate" title={inv.invoice_number}>{inv.invoice_number}</td>
+                      <td className="col-doc font-mono truncate" title={inv.order_document_number}>{inv.order_document_number}</td>
+                      <td className="col-customer truncate" title={inv.customer_name}>{inv.customer_name}</td>
+                      <td className="col-amount whitespace-nowrap">{Number(inv.total).toFixed(2)}</td>
+                      <td className="col-date whitespace-nowrap">{formatDate(inv.invoice_date)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </ResizableTable>
             </div>
           </>
         )}

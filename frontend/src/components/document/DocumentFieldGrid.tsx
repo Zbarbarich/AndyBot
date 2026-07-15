@@ -12,9 +12,11 @@ export const DocumentFieldGrid = ({ children, className = '' }: DocumentFieldGri
 export const DocumentFieldSpan = ({
   children,
   span = 4,
+  className = '',
 }: {
   children: ReactNode;
   span?: 4 | 6 | 8 | 12;
+  className?: string;
 }) => {
   const spanClass =
     span === 12
@@ -24,7 +26,7 @@ export const DocumentFieldSpan = ({
         : span === 6
           ? 'document-field-span-6'
           : 'document-field-span-4';
-  return <div className={spanClass}>{children}</div>;
+  return <div className={`${spanClass} ${className}`.trim()}>{children}</div>;
 };
 
 export default DocumentFieldGrid;

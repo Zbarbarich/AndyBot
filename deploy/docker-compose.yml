@@ -133,6 +133,8 @@ services:
       DB_SSL: "false"
       NODE_ENV: production
       COMPANY_NAME: ${COMPANY_NAME:-}
+      COMPANY_ADDRESS_LINE1: ${COMPANY_ADDRESS_LINE1:-}
+      COMPANY_CITY_STATE_ZIP: ${COMPANY_CITY_STATE_ZIP:-}
       COMPANY_LOGO_URL: ${COMPANY_LOGO_URL:-}
     depends_on:
       postgres:

@@ -87,6 +87,7 @@ export const ticketController = {
         return;
       }
       const result = await query(ticketQueries.insertResolution, [ticketId, content]);
+      await query(ticketQueries.touchUpdatedAt, [ticketId]);
       res.status(201).json(result.rows[0]);
     } catch (e) {
       console.error('ticketController.addResolution', e);

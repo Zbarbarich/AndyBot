@@ -73,7 +73,19 @@ Set:
 - `backend/api-gateway/.env` → `CORS_ORIGIN=http://localhost:5173`
 - `frontend/.env` → `VITE_API_BASE=http://localhost:3000`
 
-Optional PDF branding in each service `.env` or via Compose (production): `COMPANY_NAME`, `COMPANY_ADDRESS_LINE1`, `COMPANY_CITY_STATE_ZIP`, `COMPANY_LOGO_URL`.
+Optional PDF **sender identity** (not committed; set per environment):
+
+| Variable | Purpose |
+|----------|---------|
+| `COMPANY_NAME` | Name on PDF header/footer |
+| `COMPANY_ADDRESS_LINE1` | Street line |
+| `COMPANY_CITY_STATE_ZIP` | City / state / ZIP |
+| `COMPANY_LOGO_URL` | Optional remote logo URL (Andy minimal mark is used by default from service assets) |
+
+- Local: put these in `backend/pdf-service/.env` (gitignored). If unset, generic “Your Company” placeholders are used.
+- Production: put them in `deploy/.env`; Compose passes them into `pdf-service`.
+
+PDF documents also bundle a minimal Andy mark in `backend/pdf-service/assets/`.
 
 ## 4. Schema migrations
 
@@ -85,7 +97,19 @@ NODE_PATH=./node_modules node ../scripts/run-all-migrations.js
 cd ../..
 ```
 
-This applies `backend/shared/schema/000_*.sql` through `021_*.sql` in order. Do not re-run on a populated database without reviewing each migration (some files are historical and destructive by design).
+This applies `backend/shared/schema/000_*.sql` through `022_*.sql` in order. Do not re-run on a populated database without reviewing each migration (some files are historical and destructive by design).
+
+Existing databases that already ran through `021` can apply only the latest file:
+
+```bash
+cd backend/auth-service
+NODE_PATH=./node_modules node ../scripts/run-migration-022.js
+cd ../..
+```
+
+Migration `022` adds `users.ui_preferences` (JSONB) for per-account UI settings such as table column widths and sidebar collapsed state.
+
+Product defaults after this branch: new quotes/orders use a **6%** tax rate; line items resolve catalog SKUs via authenticated item search (not the admin-only full items list).
 
 ## 5. First user
 
@@ -122,6 +146,8 @@ Add `-v` only if you intend to delete the database volume.
 | CORS errors in browser | `CORS_ORIGIN` includes `http://localhost:5173` |
 | Blank API calls from UI | `VITE_API_BASE=http://localhost:3000` and restart Vite after editing `.env` |
 | Migration errors mid-run | Drop the volume and restart Compose for a clean DB, then re-run migrations |
+| SKU search returns empty | Confirm gateway → order-service; you are signed in; item exists (search is not admin-only) |
+| PDF shows “Your Company” | Set `COMPANY_*` in `backend/pdf-service/.env` (local) or `deploy/.env` (prod) and restart pdf-service |
 
 ## Next reading
 

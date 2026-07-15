@@ -42,6 +42,19 @@ const queries = {
     WHERE "userID" = $%i 
     RETURNING "userID", "userName", "email", "role"
   `,
+
+  getPreferences: `
+    SELECT COALESCE("ui_preferences", '{}'::jsonb) AS ui_preferences
+    FROM "users"
+    WHERE "userID" = $1
+  `,
+
+  setPreferences: `
+    UPDATE "users"
+    SET "ui_preferences" = $2::jsonb
+    WHERE "userID" = $1
+    RETURNING COALESCE("ui_preferences", '{}'::jsonb) AS ui_preferences
+  `,
 };
 
 export default queries;

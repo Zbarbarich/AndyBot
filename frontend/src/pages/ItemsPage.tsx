@@ -5,6 +5,7 @@ import { authFetch } from '../api/client';
 import { apiBase } from '../api/config';
 import { ErrorBanner } from '../components/ErrorBanner';
 import ListCardRow from '../components/ListCardRow';
+import ResizableTable from '../components/ResizableTable';
 import { ListPageToolbar } from '../components/MobilePageTitle';
 
 const API_BASE = `${apiBase}/api/app/items`;
@@ -92,20 +93,21 @@ const ItemsPage = () => {
                 />
               ))}
             </div>
-            <div className="hidden md:block table-scroll border-0 rounded-none">
-              <table>
-                <thead>
-                  <tr>
-                    <th className="col-sku">SKU</th>
-                    <th>Name</th>
-                    <th className="col-status">Category</th>
-                    <th className="col-amount">Unit price</th>
-                    <th className="col-status">U/M</th>
-                    <th className="col-amount">Stock</th>
-                    <th className="col-amount">Our cost</th>
-                    <th className="col-status">Taxable</th>
-                  </tr>
-                </thead>
+            <div className="hidden md:block">
+              <ResizableTable
+                tableId="items"
+                className="border-0 rounded-none"
+                columns={[
+                  { key: 'sku', header: 'SKU', className: 'col-sku' },
+                  { key: 'name', header: 'Name' },
+                  { key: 'category', header: 'Category', className: 'col-status' },
+                  { key: 'unitPrice', header: 'Unit price', className: 'col-amount' },
+                  { key: 'um', header: 'U/M', className: 'col-status' },
+                  { key: 'stock', header: 'Stock', className: 'col-amount' },
+                  { key: 'cost', header: 'Our cost', className: 'col-amount' },
+                  { key: 'taxable', header: 'Taxable', className: 'col-status' },
+                ]}
+              >
                 <tbody className="text-text">
                   {items.map((item) => (
                     <tr key={item.id} className="cursor-pointer" onClick={() => navigate(`/items/${item.id}`)}>
@@ -120,7 +122,7 @@ const ItemsPage = () => {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </ResizableTable>
             </div>
           </>
         )}

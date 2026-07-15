@@ -43,6 +43,7 @@ export const pdfController = {
         valid_until: doc.valid_until,
         notes: doc.notes,
         customer_po_number: doc.customer_po_number ?? undefined,
+        ticket_id: doc.ticket_id != null ? Number(doc.ticket_id) : null,
         lines: mapLines(linesResult.rows),
         subtotal: Number(doc.subtotal),
         tax_rate: Number(doc.tax_rate),
@@ -81,6 +82,7 @@ export const pdfController = {
         contact_name: doc.customer_contact_name ?? undefined,
         notes: doc.notes,
         customer_po_number: doc.customer_po_number ?? undefined,
+        ticket_id: doc.ticket_id != null ? Number(doc.ticket_id) : null,
         lines,
         subtotal: Number(doc.subtotal),
         tax_rate: Number(doc.tax_rate),
@@ -95,10 +97,25 @@ export const pdfController = {
         res.setHeader('Content-Disposition', `attachment; filename="quote-${doc.document_number}.pdf"`);
         await streamQuotePdf(data, res);
       } else {
+        const depositsResult = await query(quoteOrderQueries.getDepositsByOrderId, [id]);
+        const deposits = (depositsResult.rows as {
+          amount: string;
+          payment_method: string | null;
+          paid_at: string;
+          reference: string | null;
+          applied_to_invoice_id: number | null;
+        }[]).map((d) => ({
+          amount: Number(d.amount),
+          payment_method: d.payment_method,
+          paid_at: d.paid_at,
+          reference: d.reference,
+          applied_to_invoice_id: d.applied_to_invoice_id,
+        }));
         const data: DocData = {
           ...baseData,
           type: doc.type === 'return' ? 'return' : 'order',
           order_date: doc.order_date,
+          deposits,
         };
         res.setHeader('Content-Disposition', `attachment; filename="order-${doc.document_number}.pdf"`);
         await streamOrderPdf(data, res);
@@ -151,6 +168,7 @@ export const pdfController = {
         valid_until: doc.valid_until,
         notes: doc.notes,
         customer_po_number: doc.customer_po_number ?? undefined,
+        ticket_id: doc.ticket_id != null ? Number(doc.ticket_id) : null,
         lines: mapLines(linesResult.rows),
         subtotal: Number(doc.subtotal),
         tax_rate: Number(doc.tax_rate),
@@ -182,10 +200,16 @@ export const pdfController = {
       const doc = docResult.rows[0];
       const linesResult = await query(invoiceQueries.getLinesByInvoiceId, [id]);
       const paymentsResult = await query(invoiceQueries.getPaymentsByInvoiceId, [id]);
-      const payments = (paymentsResult.rows as { amount: string; payment_method: string | null; paid_at: string }[]).map((p) => ({
+      const payments = (paymentsResult.rows as {
+        amount: string;
+        payment_method: string | null;
+        paid_at: string;
+        reference: string | null;
+      }[]).map((p) => ({
         amount: Number(p.amount),
         payment_method: p.payment_method,
         paid_at: p.paid_at,
+        reference: p.reference,
       }));
       const data: DocData = {
         document_number: doc.invoice_number,
@@ -197,6 +221,7 @@ export const pdfController = {
         due_date: doc.due_date,
         notes: doc.order_notes ?? null,
         customer_po_number: doc.customer_po_number ?? undefined,
+        ticket_id: doc.ticket_id != null ? Number(doc.ticket_id) : null,
         lines: mapLines(linesResult.rows),
         subtotal: Number(doc.subtotal),
         tax_rate: Number(doc.tax_rate),

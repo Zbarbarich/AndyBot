@@ -1,10 +1,19 @@
 # Backend – API Gateway + Microservices
 
-The API gateway is the single entry point for the frontend. It proxies `/api/auth` to auth-service and `/api/app/*` to customer-, ticket-, order-, invoice-, or pdf-service by path. `/api/app/purchase-orders` and purchase order PDFs are proxied to order-service and pdf-service. It also exposes `GET /api/app/search?q=<term>` (JWT required), which calls each app service's search endpoint in parallel and returns aggregated JSON `{ customers, tickets, orders, invoices, items, purchase_orders }`.
+The API gateway is the single entry point for the frontend. It proxies `/api/auth` to auth-service and `/api/app/*` to customer-, ticket-, order-, invoice-, or pdf-service by path. `/api/app/purchase-orders` and purchase order PDFs are proxied to order-service and pdf-service. It also exposes:
 
-Customer payment history: `GET /api/app/customers/:id/payment-history`. Reverse invoice payment: `DELETE /api/app/invoices/:id/payments/:paymentId`. Remove unapplied deposit: `DELETE /api/app/orders/:orderId/deposits/:depositId`.
+- `GET /api/app/search?q=<term>` (JWT) — aggregated `{ customers, tickets, orders, invoices, items, purchase_orders }`
+- `GET /api/app/dashboard/summary` (JWT) — open counts, A/R, month revenue, deposits total, open POs / unpurchased line counts, stale tickets, revenue-by-month, recent orders
 
-Schema and migrations 000–021 are in `shared/schema/`; see [shared/README.md](shared/README.md) for run order and [shared/schema/README.md](shared/schema/README.md) for table reference, timezone, and timestamp discipline.
+Customer payment history: `GET /api/app/customers/:id/payment-history`. Reverse invoice payment: `DELETE /api/app/invoices/:id/payments/:paymentId`. Remove unapplied deposit: `DELETE /api/app/orders/:orderId/deposits/:depositId`. List unapplied deposits: `GET /api/app/orders/deposits/held`.
+
+Auth UI preferences: `GET` / `PATCH /api/auth/me/preferences` (JWT) — merges JSON into `users.ui_preferences` (`tableColumns`, `sidebarCollapsed`, etc.).
+
+Item SKU typeahead (any authenticated user): `GET /api/app/items/search?q=<term>` — matches SKU / name / category (ILIKE), max 20 rows; used by quote and order line editors. Full catalog `GET /api/app/items` remains admin-only.
+
+PDF sender identity (pdf-service env): `COMPANY_NAME`, `COMPANY_ADDRESS_LINE1`, `COMPANY_CITY_STATE_ZIP`, `COMPANY_LOGO_URL`. Bundled mark: `pdf-service/assets/`.
+
+Schema and migrations 000–022 are in `shared/schema/`; see [shared/README.md](shared/README.md) for run order and [shared/schema/README.md](shared/schema/README.md) for table reference, timezone, and timestamp discipline.
 
 ## Running locally
 

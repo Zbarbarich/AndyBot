@@ -4,7 +4,16 @@ Single-instance Docker Compose deployment with Caddy (HTTPS), PostgreSQL, and al
 
 ## Quick start
 
-1. Copy `deploy/.env.example` to `deploy/.env` and set `POSTGRES_USER`, `POSTGRES_PASSWORD`, `JWT_SECRET`. Optionally set `POSTGRES_DB` (default `the_nineteenth_chamber`), `JWT_EXPIRES_IN`, `CORS_ORIGIN` (production URL, e.g. `https://yourdomain.com`), and PDF fields (`COMPANY_NAME`, address lines, `COMPANY_LOGO_URL`).
+1. Copy `deploy/.env.example` to `deploy/.env` and set `POSTGRES_USER`, `POSTGRES_PASSWORD`, `JWT_SECRET`. Optionally set `POSTGRES_DB` (default `the_nineteenth_chamber`), `JWT_EXPIRES_IN`, `CORS_ORIGIN` (production URL, e.g. `https://yourdomain.com`), and PDF sender identity:
+
+   ```env
+   COMPANY_NAME=Your Company
+   COMPANY_ADDRESS_LINE1=123 Main Street
+   COMPANY_CITY_STATE_ZIP=City ST 00000
+   COMPANY_LOGO_URL=
+   ```
+
+   These are passed into `pdf-service` by `deploy/docker-compose.yml`. Keep real operator details in `deploy/.env` on the server only—never commit them.
 2. Copy `deploy/Caddyfile.example` to `deploy/Caddyfile` and replace `yourdomain.com` with your domain. `deploy/Caddyfile` is gitignored; the production file lives on the server only.
 3. On a small instance (about 1 GB RAM), add swap before the first build (see below).
 4. Run database migrations once against Postgres (see [Database migrations](#database-migrations)).
@@ -53,12 +62,19 @@ chmod +x deploy/prune-docker.sh
 
 ## Database migrations
 
-Migrations live in `backend/shared/schema/` (`000`–`021`). On a **fresh** database:
+Migrations live in `backend/shared/schema/` (`000`–`022`). On a **fresh** database:
 
 ```bash
 cd backend/auth-service
 # Point .env at the target Postgres (same user/password/db as deploy/.env)
 NODE_PATH=./node_modules node ../scripts/run-all-migrations.js
+```
+
+On an existing database that already has through `021`:
+
+```bash
+cd backend/auth-service
+NODE_PATH=./node_modules node ../scripts/run-migration-022.js
 ```
 
 See [backend/shared/README.md](../backend/shared/README.md) for per-file notes. Some historical migrations are destructive; review before re-running on an existing database.

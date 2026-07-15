@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { TicketSelector } from '../components/TicketSelector';
+import { ItemSkuSelector, type ItemSkuOption } from '../components/ItemSkuSelector';
 import { ErrorBanner } from '../components/ErrorBanner';
 import FormSection from '../components/FormSection';
 import StickyFormActions from '../components/StickyFormActions';
@@ -11,24 +12,17 @@ import DocumentToolbar from '../components/document/DocumentToolbar';
 import DocumentFieldGrid, { DocumentFieldSpan } from '../components/document/DocumentFieldGrid';
 import DocumentTotalsPanel from '../components/document/DocumentTotalsPanel';
 import DocumentStatusBadge from '../components/document/DocumentStatusBadge';
+import { useConfirm } from '../components/GlassConfirmDialog';
+import { useToast } from '../context/ToastContext';
 import { authFetch } from '../api/client';
 import { apiBase } from '../api/config';
 
 const QUOTES_API = `${apiBase}/api/app/quotes`;
 const CUSTOMERS_API = `${apiBase}/api/app/customers`;
-const ITEMS_API = `${apiBase}/api/app/items`;
 
 interface Customer {
   id: number;
   name: string;
-}
-
-interface Item {
-  id: number;
-  sku: string;
-  name: string;
-  unit_price: number;
-  taxable: boolean;
 }
 
 const UNIT_OPTIONS = ['EA', 'DZ', 'ST', 'HR'] as const;
@@ -79,9 +73,10 @@ const emptyLine = (): LineRow => ({ item_id: null, description: '', quantity: 1,
 const QuoteDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { success, error: toastError } = useToast();
+  const { confirm } = useConfirm();
   const isNew = id === 'new';
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [items, setItems] = useState<Item[]>([]);
   const [quote, setQuote] = useState<QuoteDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -95,7 +90,7 @@ const QuoteDetailPage = () => {
     valid_until: '',
     notes: '',
     customer_po_number: '',
-    tax_rate: '0.08',
+    tax_rate: '0.06',
     shipping_amount: '0',
   });
   const [lines, setLines] = useState<LineRow[]>([]);
@@ -114,13 +109,6 @@ const QuoteDetailPage = () => {
     setCustomers(data);
   }, []);
 
-  const fetchItems = useCallback(async () => {
-    const res = await authFetch(ITEMS_API);
-    if (!res.ok) return;
-    const data = await res.json();
-    setItems(data);
-  }, []);
-
   const fetchQuote = useCallback(async (quoteId: number) => {
     const res = await authFetch(`${QUOTES_API}/${quoteId}`);
     if (!res.ok) return null;
@@ -133,9 +121,8 @@ const QuoteDetailPage = () => {
       setLoading(true);
       setError('');
       await fetchCustomers();
-      await fetchItems();
       if (isNew) {
-        setForm({ customer_id: '', ticket_id: '', status: 'open', valid_until: '', notes: '', customer_po_number: '', tax_rate: '0.08', shipping_amount: '0' });
+        setForm({ customer_id: '', ticket_id: '', status: 'open', valid_until: '', notes: '', customer_po_number: '', tax_rate: '0.06', shipping_amount: '0' });
         setLines([emptyLine()]);
         setQuantityDisplay(['1']);
         setUnitPriceDisplay(['']);
@@ -188,7 +175,7 @@ const QuoteDetailPage = () => {
     };
     load();
     return () => { cancelled = true; };
-  }, [id, isNew, fetchQuote, fetchCustomers, fetchItems]);
+  }, [id, isNew, fetchQuote, fetchCustomers]);
 
   const recalcTotals = useCallback(() => {
     const subtotal = lines.reduce((sum, l) => sum + l.quantity * l.unit_price, 0);
@@ -229,6 +216,7 @@ const QuoteDetailPage = () => {
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.error || 'Failed to create quote');
+        success('Quote created');
         navigate(`/quotes/${data.id}`);
         return;
       }
@@ -239,6 +227,7 @@ const QuoteDetailPage = () => {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Failed to update quote');
+      success('Quote saved');
       setQuote({ ...quote!, ...data });
       if (data.lines && Array.isArray(data.lines) && data.lines.length > 0) {
         const newLines: LineRow[] = data.lines.map((l: LineRow & { item_sku?: string; item_name?: string; unit_of_measure?: string | null; item_unit_of_measure?: string | null }, i: number) => ({
@@ -257,7 +246,9 @@ const QuoteDetailPage = () => {
         setUnitPriceDisplay(newLines.map((l) => (Number.isFinite(l.unit_price) ? String(l.unit_price) : '')));
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Request failed');
+      const msg = e instanceof Error ? e.message : 'Request failed';
+      setError(msg);
+      toastError(msg);
     } finally {
       setSaving(false);
     }
@@ -337,9 +328,12 @@ const QuoteDetailPage = () => {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Failed to convert');
+      success('Converted to order');
       navigate(`/orders/${data.id}`);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Convert failed');
+      const msg = e instanceof Error ? e.message : 'Convert failed';
+      setError(msg);
+      toastError(msg);
     } finally {
       setConverting(false);
     }
@@ -347,7 +341,11 @@ const QuoteDetailPage = () => {
 
   const handleCancelQuote = async () => {
     if (!quote || quote.status === 'converted' || quote.status === 'closed') return;
-    if (!window.confirm('Cancel this quote? It will be marked closed and can no longer be converted to an order.')) return;
+    if (!(await confirm({
+      message: 'Cancel this quote? It will be marked closed and can no longer be converted to an order.',
+      danger: true,
+      confirmLabel: 'Cancel quote',
+    }))) return;
     setCancelling(true);
     setError('');
     try {
@@ -356,8 +354,11 @@ const QuoteDetailPage = () => {
       if (!res.ok) throw new Error(data.error || 'Failed to cancel quote');
       setQuote({ ...quote, ...data });
       setForm((f) => ({ ...f, status: data.status ?? 'closed' }));
+      success('Quote cancelled');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to cancel quote');
+      const msg = e instanceof Error ? e.message : 'Failed to cancel quote';
+      setError(msg);
+      toastError(msg);
     } finally {
       setCancelling(false);
     }
@@ -377,25 +378,40 @@ const QuoteDetailPage = () => {
     setLines((prev) => {
       const next = [...prev];
       next[index] = { ...next[index], [field]: value };
-      if (field === 'item_id' && value != null) {
-        const item = items.find((i) => i.id === Number(value));
-        if (item) {
-          next[index].unit_price = item.unit_price;
-          next[index].description = item.name;
-        }
-      }
       return next;
     });
-    if (field === 'item_id' && value != null) {
-      const item = items.find((i) => i.id === Number(value));
-      if (item) {
-        setUnitPriceDisplay((prev) => {
-          const next = [...prev];
-          while (next.length <= index) next.push('');
-          next[index] = String(item.unit_price);
-          return next;
-        });
+  };
+
+  const applyItemToLine = (index: number, item: ItemSkuOption | null) => {
+    setLines((prev) => {
+      const next = [...prev];
+      if (!item) {
+        next[index] = {
+          ...next[index],
+          item_id: null,
+          item_sku: undefined,
+          item_name: undefined,
+        };
+        return next;
       }
+      next[index] = {
+        ...next[index],
+        item_id: item.id,
+        item_sku: item.sku,
+        item_name: item.name,
+        unit_price: Number(item.unit_price),
+        description: item.name,
+        unit_of_measure: item.unit_of_measure || next[index].unit_of_measure || 'EA',
+      };
+      return next;
+    });
+    if (item) {
+      setUnitPriceDisplay((prev) => {
+        const next = [...prev];
+        while (next.length <= index) next.push('');
+        next[index] = String(item.unit_price);
+        return next;
+      });
     }
   };
 
@@ -625,7 +641,8 @@ const QuoteDetailPage = () => {
             <table>
                 <thead>
                   <tr>
-                    <th>Item / Description</th>
+                    <th>SKU</th>
+                    <th>Description</th>
                     <th>Qty</th>
                     <th>U/M</th>
                     <th>Unit price</th>
@@ -636,31 +653,30 @@ const QuoteDetailPage = () => {
                 <tbody className="text-text">
                   {lines.map((line, idx) => (
                     <tr key={idx}>
-                      <td className="min-w-[160px]">
+                      <td className="min-w-[120px] align-top">
+                        {readOnly ? (
+                          <span className="font-mono text-sm">{line.item_sku || '—'}</span>
+                        ) : (
+                          <ItemSkuSelector
+                            itemId={line.item_id}
+                            sku={line.item_sku}
+                            onSelect={(item) => applyItemToLine(idx, item)}
+                            className="w-full max-w-[160px]"
+                            inputClassName="w-full"
+                          />
+                        )}
+                      </td>
+                      <td className="min-w-[160px] align-top">
                         {readOnly ? (
                           <span>{line.description || (line.item_name ?? '—')}</span>
                         ) : (
-                          <>
-                            <select
-                              value={line.item_id ?? ''}
-                              onChange={(e) => updateLine(idx, 'item_id', e.target.value ? parseInt(e.target.value, 10) : null)}
-                              className="input-field w-full max-w-[200px]"
-                            >
-                              <option value="">— Ad-hoc —</option>
-                              {items.map((it) => (
-                                <option key={it.id} value={it.id}>
-                                  {it.sku} – {it.name}
-                                </option>
-                              ))}
-                            </select>
-                            <input
-                              type="text"
-                              value={line.description}
-                              onChange={(e) => updateLine(idx, 'description', e.target.value)}
-                              className="input-field mt-1 w-full"
-                              placeholder="Description override"
-                            />
-                          </>
+                          <input
+                            type="text"
+                            value={line.description}
+                            onChange={(e) => updateLine(idx, 'description', e.target.value)}
+                            className="input-field w-full"
+                            placeholder="Description"
+                          />
                         )}
                       </td>
                       <td>
@@ -765,7 +781,7 @@ const QuoteDetailPage = () => {
             >
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-3">
                 <div>
-                  <label className="block text-sm font-medium text-text-muted mb-1">Tax rate (e.g. 0.08)</label>
+                  <label className="block text-sm font-medium text-text-muted mb-1">Tax rate (e.g. 0.06)</label>
                   <input
                     type="number"
                     step="0.0001"

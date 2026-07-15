@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { authFetch } from '../api/client';
 import { BackArrow } from '../components/BackArrow';
+import { useToast } from '../context/ToastContext';
 import { apiBase } from '../api/config';
 
 const API_BASE = `${apiBase}/api/app/items`;
@@ -10,6 +11,7 @@ const UNIT_OPTIONS = ['EA', 'DZ', 'ST', 'HR'] as const;
 const ItemEditPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { success, error: toastError } = useToast();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [form, setForm] = useState({
@@ -75,9 +77,12 @@ const ItemEditPage = () => {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Update failed');
+      success('Item saved');
       navigate(`/items/${id}`, { replace: true });
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Update failed');
+      const msg = e instanceof Error ? e.message : 'Update failed';
+      setError(msg);
+      toastError(msg);
     }
   };
 
