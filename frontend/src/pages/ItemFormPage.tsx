@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authFetch } from '../api/client';
 import { BackArrow } from '../components/BackArrow';
+import { useToast } from '../context/ToastContext';
 import { apiBase } from '../api/config';
 
 const API_BASE = `${apiBase}/api/app/items`;
@@ -9,6 +10,7 @@ const UNIT_OPTIONS = ['EA', 'DZ', 'ST', 'HR'] as const;
 
 const ItemFormPage = () => {
   const navigate = useNavigate();
+  const { success, error: toastError } = useToast();
   const [error, setError] = useState('');
   const [form, setForm] = useState({
     sku: '',
@@ -45,9 +47,12 @@ const ItemFormPage = () => {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Request failed');
+      success('Item created');
       navigate(`/items/${data.id}`, { replace: true });
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Request failed');
+      const msg = e instanceof Error ? e.message : 'Request failed';
+      setError(msg);
+      toastError(msg);
     }
   };
 

@@ -18,7 +18,13 @@ const purchaseOrderQueries = {
            q.document_number AS order_document_number,
            q.customer_po_number,
            q.total AS order_total,
-           c.name AS customer_name
+           c.name AS customer_name,
+           COALESCE((
+             SELECT COUNT(*)::int
+             FROM purchase_order_lines pol
+             WHERE pol.purchase_order_id = po.id
+               AND pol.ordered_at IS NULL
+           ), 0) AS line_count
     FROM purchase_orders po
     JOIN quotes_orders q ON q.id = po.order_id
     JOIN customers c ON c.id = q.customer_id

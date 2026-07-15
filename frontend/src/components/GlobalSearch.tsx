@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Search, Users, Ticket, FileText, Receipt, Package, ShoppingCart } from 'lucide-react';
 import { authFetch } from '../api/client';
 import { apiBase } from '../api/config';
@@ -34,6 +34,16 @@ export default function GlobalSearch({ getToken, className = '', placeholder = '
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Clear search when navigating to a different page
+  useEffect(() => {
+    setQuery('');
+    setResults(null);
+    setOpen(false);
+    setLoading(false);
+    inputRef.current?.blur();
+  }, [location.pathname]);
 
   const runSearch = useCallback(async (q: string) => {
     if (!q.trim()) {
@@ -123,7 +133,9 @@ export default function GlobalSearch({ getToken, className = '', placeholder = '
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => query.trim() && setOpen(true)}
           placeholder={placeholder}
-          className={`input-field w-full py-2 pl-9 pr-3 text-sm rounded-full ${compact ? 'input-field-compact' : ''}`}
+          className={`input-field w-full pl-9 pr-3 text-sm rounded-full ${
+            compact ? 'input-field-compact' : 'py-2'
+          }`}
           aria-label="Global search"
           aria-expanded={open}
           aria-autocomplete="list"

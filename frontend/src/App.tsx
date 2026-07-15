@@ -25,8 +25,12 @@ import PurchasingPage from './pages/PurchasingPage';
 import PurchaseOrderDetailPage from './pages/PurchaseOrderDetailPage';
 import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider } from './context/AuthContext';
+import { PreferencesProvider } from './context/PreferencesContext';
+import { ToastProvider } from './context/ToastContext';
+import { ConfirmProvider } from './components/GlassConfirmDialog';
 import ProtectedRoute from './components/ProtectedRoute';
 import AppLayout from './components/AppLayout';
+import ScrollToTop from './components/ScrollToTop';
 
 function QuoteIdRedirect() {
   const { id } = useParams<{ id: string }>();
@@ -37,7 +41,11 @@ function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
+      <PreferencesProvider>
+      <ToastProvider>
+      <ConfirmProvider>
       <Router>
+        <ScrollToTop />
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route
@@ -75,6 +83,9 @@ function App() {
           </Route>
         </Routes>
       </Router>
+      </ConfirmProvider>
+      </ToastProvider>
+      </PreferencesProvider>
       </AuthProvider>
     </ThemeProvider>
   );

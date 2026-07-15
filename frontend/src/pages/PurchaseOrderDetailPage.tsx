@@ -9,6 +9,8 @@ import DocumentToolbar from '../components/document/DocumentToolbar';
 import DocumentFieldGrid, { DocumentFieldSpan } from '../components/document/DocumentFieldGrid';
 import DocumentTotalsPanel from '../components/document/DocumentTotalsPanel';
 import DocumentStatusBadge from '../components/document/DocumentStatusBadge';
+import { useConfirm } from '../components/GlassConfirmDialog';
+import { useToast } from '../context/ToastContext';
 import { authFetch } from '../api/client';
 import { formatDate } from '../utils/formatDate';
 import { apiBase } from '../api/config';
@@ -49,6 +51,8 @@ const ORDERED_VIA_OPTIONS = ['Email', 'Phone', 'Vendor portal', 'Fax', 'Online',
 
 const PurchaseOrderDetailPage = () => {
   const { id } = useParams<{ id: string }>();
+  const { success, error: toastError } = useToast();
+  const { confirm } = useConfirm();
   const [po, setPo] = useState<PurchaseOrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -61,7 +65,7 @@ const PurchaseOrderDetailPage = () => {
   const [lineOrderedViaNotes, setLineOrderedViaNotes] = useState('');
   const [markingReceivedId, setMarkingReceivedId] = useState<number | null>(null);
 
-  const fetchPo = useCallback(async () => {
+  const fetchPo = useCallback(async (opts?: { silent?: boolean }) => {
     if (!id) return;
     const numId = parseInt(id, 10);
     if (isNaN(numId)) {
@@ -69,14 +73,16 @@ const PurchaseOrderDetailPage = () => {
       setLoading(false);
       return;
     }
-    setLoading(true);
-    setError('');
+    if (!opts?.silent) {
+      setLoading(true);
+      setError('');
+    }
     try {
       const res = await authFetch(`${API_BASE}/${numId}`);
       if (!res.ok) {
         if (res.status === 404) setError('Purchase order not found');
         else setError('Failed to load PO');
-        setLoading(false);
+        if (!opts?.silent) setLoading(false);
         return;
       }
       const data = await res.json();
@@ -84,7 +90,7 @@ const PurchaseOrderDetailPage = () => {
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load purchase order');
     } finally {
-      setLoading(false);
+      if (!opts?.silent) setLoading(false);
     }
   }, [id]);
 
@@ -92,6 +98,15 @@ const PurchaseOrderDetailPage = () => {
     fetchPo();
   }, [fetchPo]);
 
+  const patchPoLine = useCallback((lineId: number, patch: Partial<POLine>) => {
+    setPo((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        lines: prev.lines.map((l) => (l.id === lineId ? { ...l, ...patch } : l)),
+      };
+    });
+  }, []);
   const handleViewPdf = async () => {
     if (!po) return;
     setPdfLoading(true);
@@ -138,7 +153,7 @@ const PurchaseOrderDetailPage = () => {
     try {
       const res = await authFetch(`${API_BASE}/${po.id}/close`, { method: 'PATCH' });
       if (!res.ok) throw new Error('Failed to close PO');
-      await fetchPo();
+      await fetchPo({ silent: true });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to close purchase order');
     } finally {
@@ -148,16 +163,22 @@ const PurchaseOrderDetailPage = () => {
 
   const handleCancelPo = async () => {
     if (!po || po.status !== 'open') return;
-    if (!window.confirm('Cancel this purchase order? Order lines can be added to a new PO after cancellation.')) return;
+    if (!(await confirm({
+      message: 'Cancel this purchase order? Order lines can be added to a new PO after cancellation.',
+      danger: true,
+    }))) return;
     setCancelling(true);
     setError('');
     try {
       const res = await authFetch(`${API_BASE}/${po.id}/cancel`, { method: 'PATCH' });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error((data as { error?: string }).error || 'Failed to cancel PO');
-      await fetchPo();
+      success('Purchase order cancelled');
+      await fetchPo({ silent: true });
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to cancel purchase order');
+      const msg = e instanceof Error ? e.message : 'Failed to cancel purchase order';
+      setError(msg);
+      toastError(msg);
     } finally {
       setCancelling(false);
     }
@@ -178,7 +199,12 @@ const PurchaseOrderDetailPage = () => {
         }),
       });
       if (!res.ok) throw new Error('Failed to update line');
-      await fetchPo();
+      const updated = (await res.json()) as Partial<POLine>;
+      patchPoLine(lineId, {
+        ordered_at: updated.ordered_at ?? new Date().toISOString(),
+        ordered_via: updated.ordered_via ?? (orderedVia || null),
+        ordered_via_notes: updated.ordered_via_notes ?? (orderedViaNotes.trim() || null),
+      });
       setLineEditId(null);
       setLineOrderedVia('');
       setLineOrderedViaNotes('');
@@ -196,7 +222,10 @@ const PurchaseOrderDetailPage = () => {
     try {
       const res = await authFetch(`${API_BASE}/${po.id}/lines/${lineId}/received`, { method: 'PATCH' });
       if (!res.ok) throw new Error('Failed to mark received');
-      await fetchPo();
+      const updated = (await res.json()) as Partial<POLine>;
+      patchPoLine(lineId, {
+        received_at: updated.received_at ?? new Date().toISOString(),
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to mark received');
     } finally {

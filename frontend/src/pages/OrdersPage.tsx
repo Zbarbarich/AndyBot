@@ -6,6 +6,7 @@ import { formatDate } from '../utils/formatDate';
 import { apiBase } from '../api/config';
 import { ErrorBanner } from '../components/ErrorBanner';
 import ListCardRow from '../components/ListCardRow';
+import ResizableTable from '../components/ResizableTable';
 import { ListPageToolbar } from '../components/MobilePageTitle';
 
 const API_BASE = `${apiBase}/api/app/orders`;
@@ -99,18 +100,19 @@ const OrdersPage = () => {
                 />
               ))}
             </div>
-            <div className="hidden md:block table-scroll border-0 rounded-none">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Document #</th>
-                    <th className="col-status">Type</th>
-                    <th>Customer</th>
-                    <th className="col-amount">Total</th>
-                    <th className="col-status">Status</th>
-                    <th className="col-date">Date</th>
-                  </tr>
-                </thead>
+            <div className="hidden md:block">
+              <ResizableTable
+                tableId="orders"
+                className="border-0 rounded-none"
+                columns={[
+                  { key: 'doc', header: 'Document #' },
+                  { key: 'type', header: 'Type', className: 'col-status' },
+                  { key: 'customer', header: 'Customer' },
+                  { key: 'total', header: 'Total', className: 'col-amount' },
+                  { key: 'status', header: 'Status', className: 'col-status' },
+                  { key: 'date', header: 'Date', className: 'col-date' },
+                ]}
+              >
                 <tbody className="text-text">
                   {orders.map((o) => (
                     <tr key={o.id} className="cursor-pointer" onClick={() => navigate(`/orders/${o.id}`)}>
@@ -123,7 +125,7 @@ const OrdersPage = () => {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </ResizableTable>
             </div>
           </>
         )}

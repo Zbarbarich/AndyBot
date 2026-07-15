@@ -17,6 +17,7 @@ import {
   X,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { usePreferences } from '../context/PreferencesContext';
 import GlobalSearch from './GlobalSearch';
 import AndyLogo from './AndyLogo';
 import ThemeToggle from './ThemeToggle';
@@ -38,10 +39,10 @@ const AppLayout = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const { sidebarCollapsed, setSidebarCollapsed } = usePreferences();
   const pageTitle = getPageTitle(location.pathname);
   const mobileNav = getMobileNavTarget(location.pathname);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
 
@@ -126,52 +127,59 @@ const AppLayout = () => {
   return (
     <div className="min-h-screen bg-bg flex flex-col lg:grid lg:grid-cols-[auto_1fr]">
       <aside
-        className={`app-sidebar hidden lg:flex flex-col border-r transition-[width] duration-200 ${
-          sidebarCollapsed ? 'lg:w-[5.5rem]' : 'lg:w-56'
+        className={`app-sidebar hidden lg:flex flex-col border-r transition-[width] duration-200 sticky top-0 self-start h-dvh max-h-dvh z-30 ${
+          sidebarCollapsed ? 'lg:w-16' : 'lg:w-56'
         }`}
       >
-        <div className={`flex items-center gap-2 p-3 border-b border-border ${sidebarCollapsed ? 'min-h-16' : 'min-h-[5.5rem]'}`}>
+        <div
+          className={`app-topbar ${
+            sidebarCollapsed
+              ? 'relative flex items-center justify-center px-1'
+              : 'flex items-center gap-1 px-2'
+          }`}
+        >
           {sidebarCollapsed ? (
             <>
-              <div className="flex-1 flex justify-center">
-                <AndyLogo size="sm" showWordmark={false} linkToHome collapsed />
-              </div>
+              <AndyLogo size="icon" showWordmark={false} linkToHome collapsed />
               <button
                 type="button"
                 onClick={() => setSidebarCollapsed(false)}
-                className="btn-sidebar-chevron p-2 text-text-muted hover:text-text"
+                className="btn-sidebar-chevron absolute right-0.5 top-1/2 -translate-y-1/2 p-0.5 rounded text-text-muted hover:text-text"
                 aria-label="Expand sidebar"
               >
-                <ChevronLeft className="w-5 h-5 rotate-180" />
+                <ChevronLeft className="w-3 h-3 rotate-180" />
               </button>
             </>
           ) : (
             <>
-              <div className="flex-1 min-w-0 flex justify-center px-1">
-                <AndyLogo size="sm" showWordmark showTagline linkToHome />
+              <div className="flex-1 min-w-0 flex items-center justify-center">
+                <AndyLogo size="sm" showWordmark layout="row" linkToHome />
               </div>
               <button
                 type="button"
                 onClick={() => setSidebarCollapsed(true)}
-                className="btn-sidebar-chevron shrink-0 self-start mt-1 p-2 text-text-muted hover:text-text"
+                className="btn-sidebar-chevron shrink-0 p-1 rounded text-text-muted hover:text-text"
                 aria-label="Collapse sidebar"
               >
-                <ChevronLeft className="w-5 h-5" />
+                <ChevronLeft className="w-4 h-4" />
               </button>
             </>
           )}
         </div>
-        <nav className="flex-1 py-3 px-2 space-y-1 overflow-y-auto">{renderNavLinks(sidebarCollapsed)}</nav>
+        <nav className="flex-1 py-2 px-2 space-y-0.5 overflow-y-auto">{renderNavLinks(sidebarCollapsed)}</nav>
       </aside>
 
       <div className="flex flex-col flex-1 min-w-0">
-        <header className="hidden lg:flex app-header items-center gap-4 px-4 sm:px-6 min-h-16">
-          <h1 className="flex-1 min-w-0 text-sm font-display font-semibold text-text truncate">{pageTitle}</h1>
-          <div className="shrink-0 w-full max-w-xl">
+        <header className="hidden lg:flex app-header app-topbar items-center gap-3 px-4 sm:px-5">
+          <h1 className="flex-1 min-w-0 text-xs font-display font-semibold text-text truncate tracking-wide uppercase opacity-90">
+            {pageTitle}
+          </h1>
+          <div className="shrink-0 w-full max-w-md">
             <GlobalSearch
               getToken={() => localStorage.getItem('token')}
-              placeholder="Search customers, tickets, orders, invoices, POs, items…"
+              placeholder="Search…"
               className="w-full"
+              compact
             />
           </div>
           <div className="flex-1 flex justify-end" ref={profileRef}>
@@ -179,11 +187,11 @@ const AppLayout = () => {
               <button
                 type="button"
                 onClick={() => setProfileOpen((o) => !o)}
-                className="p-2.5 rounded-lg text-text-muted hover:text-text hover:bg-surface-elevated min-h-[44px] min-w-[44px] flex items-center justify-center"
+                className="p-1.5 rounded-lg text-text-muted hover:text-text hover:bg-surface-elevated h-8 w-8 flex items-center justify-center"
                 aria-label="Profile"
                 aria-expanded={profileOpen}
               >
-                <CircleUser className="w-5 h-5" />
+                <CircleUser className="w-4 h-4" />
               </button>
               {profileOpen && (
                 <div className="absolute right-0 top-full mt-1 py-2 w-56 glass-panel z-50 overflow-hidden">
@@ -195,7 +203,7 @@ const AppLayout = () => {
         </header>
 
         <nav className="lg:hidden app-header safe-area-pt">
-          <div className="px-3 sm:px-4 py-2 flex items-center gap-2 min-h-14">
+          <div className="app-topbar px-3 sm:px-4 flex items-center gap-2">
             {mobileNavControl}
             <div className="flex-1 min-w-0">
               <GlobalSearch

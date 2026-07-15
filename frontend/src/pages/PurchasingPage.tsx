@@ -5,6 +5,7 @@ import { formatDate } from '../utils/formatDate';
 import { apiBase } from '../api/config';
 import { ErrorBanner } from '../components/ErrorBanner';
 import ListCardRow from '../components/ListCardRow';
+import ResizableTable from '../components/ResizableTable';
 import { ListPageToolbar } from '../components/MobilePageTitle';
 
 const API_BASE = `${apiBase}/api/app/purchase-orders`;
@@ -113,45 +114,46 @@ const PurchasingPage = () => {
               />
             ))}
           </div>
-          <div className="hidden md:block table-scroll border-0 rounded-none">
-          <table>
-            <thead>
-              <tr>
-                <th>PO #</th>
-                <th>Order</th>
-                <th>Customer</th>
-                <th>Customer PO</th>
-                <th>Total</th>
-                <th className="col-date">Created</th>
-                <th className="col-status">Status</th>
-              </tr>
-            </thead>
-            <tbody className="text-text">
-              {filteredPOs.map((po) => (
-                <tr
-                  key={po.id}
-                  className="cursor-pointer hover:bg-surface-elevated/50 active:bg-surface-elevated/70"
-                  onClick={() => navigate(`/purchasing/${po.id}`)}
-                >
-                  <td className="font-mono font-medium">
-                    <Link to={`/purchasing/${po.id}`} className="text-primary hover:underline" onClick={(e) => e.stopPropagation()}>
-                      {po.po_number}
-                    </Link>
-                  </td>
-                  <td className="font-mono">
-                    <Link to={`/orders/${po.order_id}`} className="text-primary hover:underline" onClick={(e) => e.stopPropagation()}>
-                      {po.order_document_number ?? String(po.order_id)}
-                    </Link>
-                  </td>
-                  <td className="truncate max-w-[12rem]" title={po.customer_name ?? undefined}>{po.customer_name ?? '—'}</td>
-                  <td className="font-mono truncate max-w-[8rem]" title={po.customer_po_number ?? undefined}>{po.customer_po_number ?? '—'}</td>
-                  <td className="whitespace-nowrap">{formatCurrency(po.order_total)}</td>
-                  <td className="col-date whitespace-nowrap">{formatDate(po.created_at)}</td>
-                  <td className="col-status">{po.status}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="hidden md:block">
+            <ResizableTable
+              tableId="purchasing"
+              className="border-0 rounded-none"
+              columns={[
+                { key: 'po', header: 'PO #' },
+                { key: 'order', header: 'Order' },
+                { key: 'customer', header: 'Customer' },
+                { key: 'customerPo', header: 'Customer PO' },
+                { key: 'total', header: 'Total' },
+                { key: 'created', header: 'Created', className: 'col-date' },
+                { key: 'status', header: 'Status', className: 'col-status' },
+              ]}
+            >
+              <tbody className="text-text">
+                {filteredPOs.map((po) => (
+                  <tr
+                    key={po.id}
+                    className="cursor-pointer hover:bg-surface-elevated/50 active:bg-surface-elevated/70"
+                    onClick={() => navigate(`/purchasing/${po.id}`)}
+                  >
+                    <td className="font-mono font-medium">
+                      <Link to={`/purchasing/${po.id}`} className="text-primary hover:underline" onClick={(e) => e.stopPropagation()}>
+                        {po.po_number}
+                      </Link>
+                    </td>
+                    <td className="font-mono">
+                      <Link to={`/orders/${po.order_id}`} className="text-primary hover:underline" onClick={(e) => e.stopPropagation()}>
+                        {po.order_document_number ?? String(po.order_id)}
+                      </Link>
+                    </td>
+                    <td className="truncate max-w-[12rem]" title={po.customer_name ?? undefined}>{po.customer_name ?? '—'}</td>
+                    <td className="font-mono truncate max-w-[8rem]" title={po.customer_po_number ?? undefined}>{po.customer_po_number ?? '—'}</td>
+                    <td className="whitespace-nowrap">{formatCurrency(po.order_total)}</td>
+                    <td className="col-date whitespace-nowrap">{formatDate(po.created_at)}</td>
+                    <td className="col-status">{po.status}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </ResizableTable>
           </div>
         </>
       )}

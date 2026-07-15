@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { Eye, Trash2, Paperclip, Plus, FileText } from 'lucide-react';
 import heic2any from 'heic2any';
 import { authFetch } from '../api/client';
+import { useConfirm } from './GlassConfirmDialog';
+import { useToast } from '../context/ToastContext';
 
 export interface TicketImage {
   id: number;
@@ -48,6 +50,8 @@ const AttachmentGallery = ({
   onImagesChange,
   onError,
 }: AttachmentGalleryProps) => {
+  const { success, error: toastError } = useToast();
+  const { confirm } = useConfirm();
   const [imageUrls, setImageUrls] = useState<Record<number, string>>({});
   const [addingImage, setAddingImage] = useState(false);
   const [deletingImageId, setDeletingImageId] = useState<number | null>(null);
@@ -146,7 +150,7 @@ const AttachmentGallery = ({
   };
 
   const handleDeleteImage = async (imageId: number) => {
-    if (!window.confirm('Remove this attachment?')) return;
+    if (!(await confirm({ message: 'Remove this attachment?', danger: true }))) return;
     setDeletingImageId(imageId);
     try {
       const res = await authFetch(`${ticketsApi}/${ticketId}/images/${imageId}`, { method: 'DELETE' });
@@ -160,8 +164,11 @@ const AttachmentGallery = ({
         });
       }
       onImagesChange(images.filter((i) => i.id !== imageId));
+      success('Attachment removed');
     } catch (err) {
-      onError?.(err instanceof Error ? err.message : 'Failed to delete image');
+      const msg = err instanceof Error ? err.message : 'Failed to delete image';
+      onError?.(msg);
+      toastError(msg);
     } finally {
       setDeletingImageId(null);
     }

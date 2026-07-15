@@ -13,14 +13,14 @@ cd backend/auth-service
 NODE_PATH=./node_modules node ../scripts/run-all-migrations.js
 ```
 
-This applies `schema/000_*.sql` through `schema/021_*.sql` in order.
+This applies `schema/000_*.sql` through `schema/022_*.sql` in order.
 
 ## Individual runners
 
 Per-file Node runners also exist as `backend/scripts/run-migration-NNN.js` for incremental updates on existing hosts. Example:
 
 ```bash
-cd backend/auth-service && NODE_PATH=./node_modules node ../scripts/run-migration-020.js
+cd backend/auth-service && NODE_PATH=./node_modules node ../scripts/run-migration-022.js
 ```
 
 ## Migration notes
@@ -37,6 +37,7 @@ cd backend/auth-service && NODE_PATH=./node_modules node ../scripts/run-migratio
 | `019` | Drop redundant indexes |
 | `020` | PO line notes / received |
 | `021` | Ticket attachments extension |
+| `022` | `users.ui_preferences` JSONB (table column widths, sidebar state, etc.) |
 
 After creating users schema, create an admin with `create-first-user.js` (see [docs/ONBOARDING.md](../../docs/ONBOARDING.md)).
 

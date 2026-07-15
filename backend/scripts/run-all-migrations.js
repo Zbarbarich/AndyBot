@@ -1,5 +1,5 @@
 /**
- * Apply schema migrations 000–021 in order.
+ * Apply schema migrations 000–022 in order.
  * Requires a running Postgres and env loaded from the current working directory's .env
  * (typically backend/auth-service/.env).
  *
@@ -35,6 +35,7 @@ const MIGRATIONS = [
   '019_drop_redundant_indexes.sql',
   '020_purchase_order_line_notes_received.sql',
   '021_ticket_attachments_extend.sql',
+  '022_user_ui_preferences.sql',
 ];
 
 async function main() {

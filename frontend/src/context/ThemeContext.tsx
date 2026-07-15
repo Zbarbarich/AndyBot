@@ -36,6 +36,16 @@ export const ThemeProvider = ({ children }: ThemeProviderProps) => {
     localStorage.setItem('theme', theme);
   }, [theme]);
 
+  // Sync theme when another browser tab changes it
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== 'theme') return;
+      if (e.newValue === 'light' || e.newValue === 'dark') setTheme(e.newValue);
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
+
   const toggleTheme = () => {
     setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
   };

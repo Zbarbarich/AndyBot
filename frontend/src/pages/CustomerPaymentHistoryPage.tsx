@@ -4,6 +4,9 @@ import { authFetch } from '../api/client';
 import { formatDate } from '../utils/formatDate';
 import { BackArrow } from '../components/BackArrow';
 import ResponsiveEntityList from '../components/ResponsiveEntityList';
+import ResizableTable from '../components/ResizableTable';
+import { useConfirm } from '../components/GlassConfirmDialog';
+import { useToast } from '../context/ToastContext';
 import { apiBase } from '../api/config';
 
 const CUSTOMERS_API = `${apiBase}/api/app/customers`;
@@ -28,6 +31,8 @@ interface PaymentRow {
 const CustomerPaymentHistoryPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { success, error: toastError } = useToast();
+  const { confirm } = useConfirm();
   const [customerName, setCustomerName] = useState<string>('');
   const [payments, setPayments] = useState<PaymentRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -82,7 +87,7 @@ const CustomerPaymentHistoryPage = () => {
       row.payment_type === 'invoice'
         ? `Reverse this payment of $${Number(row.amount).toFixed(2)} on Invoice ${row.invoice_number}? This cannot be undone.`
         : `Remove this unapplied deposit of $${Number(row.amount).toFixed(2)}?`;
-    if (!window.confirm(msg)) return;
+    if (!(await confirm({ message: msg, danger: true }))) return;
 
     setReversingId({
       type: row.payment_type,
@@ -96,20 +101,22 @@ const CustomerPaymentHistoryPage = () => {
         const res = await authFetch(`${INVOICES_API}/${row.invoice_id}/payments/${row.id}`, { method: 'DELETE' });
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
-          alert(err.error || 'Failed to reverse payment');
+          toastError(err.error || 'Failed to reverse payment');
           return;
         }
+        success('Payment reversed');
       } else if (row.payment_type === 'deposit' && row.applied_to_invoice_id == null) {
         const res = await authFetch(`${ORDERS_API}/${row.order_id}/deposits/${row.id}`, { method: 'DELETE' });
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
-          alert(err.error || 'Failed to remove deposit');
+          toastError(err.error || 'Failed to remove deposit');
           return;
         }
+        success('Deposit removed');
       }
       await load();
     } catch {
-      alert('Request failed');
+      toastError('Request failed');
     } finally {
       setReversingId(null);
     }
@@ -192,118 +199,119 @@ const CustomerPaymentHistoryPage = () => {
             );
           }}
           renderTable={() => (
-          <table>
-            <thead>
-              <tr>
-                <th className="col-date">Date</th>
-                <th>Type</th>
-                <th className="col-amount">Amount</th>
-                <th>Method</th>
-                <th>Reference</th>
-                <th>Order #</th>
-                <th>Invoice / Applied to</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody className="text-text">
-              {payments.map((row) => {
-                const canReverse =
-                  row.payment_type === 'invoice' ||
-                  (row.payment_type === 'deposit' && row.applied_to_invoice_id == null);
-                const isReversing =
-                  reversingId?.type === row.payment_type &&
-                  reversingId?.id === row.id &&
-                  (row.payment_type !== 'invoice' || reversingId?.invoice_id === row.invoice_id) &&
-                  (row.payment_type !== 'deposit' || reversingId?.order_id === row.order_id);
-                return (
-                  <tr key={`${row.payment_type}-${row.id}`}>
-                    <td className="col-date whitespace-nowrap">{formatDate(row.paid_at)}</td>
-                    <td>{row.payment_type === 'invoice' ? 'Invoice payment' : 'Deposit'}</td>
-                    <td className="col-amount">${Number(row.amount).toFixed(2)}</td>
-                    <td>{row.payment_method ?? '—'}</td>
-                    <td>{row.reference ?? '—'}</td>
-                    <td className="font-mono">
-                      {row.order_document_number ? (
-                        <button
-                          type="button"
-                          className="link-primary text-sm"
-                          onClick={() => navigate(`/orders/${row.order_id}`)}
-                        >
-                          {row.order_document_number}
-                        </button>
-                      ) : (
-                        '—'
-                      )}
-                    </td>
-                    <td>
-                      {row.payment_type === 'invoice' && row.invoice_number && (
-                        <button
-                          type="button"
-                          className="link-primary text-sm font-mono"
-                          onClick={() => navigate(`/invoices/${row.invoice_id}`)}
-                        >
-                          {row.invoice_number}
-                        </button>
-                      )}
-                      {row.payment_type === 'deposit' &&
-                        (row.applied_invoice_number ? (
-                          <span className="text-text-muted text-sm">
-                            Applied to{' '}
-                            <button
-                              type="button"
-                              className="link-primary font-mono"
-                              onClick={() => navigate(`/invoices/${row.applied_to_invoice_id}`)}
-                            >
-                              {row.applied_invoice_number}
-                            </button>
-                          </span>
+            <ResizableTable
+              tableId="payment-history"
+              embedded
+              columns={[
+                { key: 'date', header: 'Date', className: 'col-date' },
+                { key: 'type', header: 'Type' },
+                { key: 'amount', header: 'Amount', className: 'col-amount' },
+                { key: 'method', header: 'Method' },
+                { key: 'reference', header: 'Reference' },
+                { key: 'order', header: 'Order #' },
+                { key: 'invoice', header: 'Invoice / Applied to' },
+                { key: 'action', header: 'Action' },
+              ]}
+            >
+              <tbody className="text-text">
+                {payments.map((row) => {
+                  const canReverse =
+                    row.payment_type === 'invoice' ||
+                    (row.payment_type === 'deposit' && row.applied_to_invoice_id == null);
+                  const isReversing =
+                    reversingId?.type === row.payment_type &&
+                    reversingId?.id === row.id &&
+                    (row.payment_type !== 'invoice' || reversingId?.invoice_id === row.invoice_id) &&
+                    (row.payment_type !== 'deposit' || reversingId?.order_id === row.order_id);
+                  return (
+                    <tr key={`${row.payment_type}-${row.id}`}>
+                      <td className="col-date whitespace-nowrap">{formatDate(row.paid_at)}</td>
+                      <td>{row.payment_type === 'invoice' ? 'Invoice payment' : 'Deposit'}</td>
+                      <td className="col-amount">${Number(row.amount).toFixed(2)}</td>
+                      <td>{row.payment_method ?? '—'}</td>
+                      <td>{row.reference ?? '—'}</td>
+                      <td className="font-mono">
+                        {row.order_document_number ? (
+                          <button
+                            type="button"
+                            className="link-primary text-sm"
+                            onClick={() => navigate(`/orders/${row.order_id}`)}
+                          >
+                            {row.order_document_number}
+                          </button>
                         ) : (
-                          <span className="text-text-muted text-sm">Unapplied</span>
-                        ))}
-                      {row.payment_type === 'invoice' && !row.invoice_number && '—'}
-                    </td>
-                    <td>
-                      {canReverse ? (
-                        <button
-                          type="button"
-                          className="btn-secondary text-sm py-1 px-2 min-h-0 text-red-400 border-red-500/50 hover:border-red-500"
-                          onClick={() => handleReverse(row)}
-                          disabled={!!isReversing}
-                        >
-                          {isReversing ? 'Reversing…' : row.payment_type === 'invoice' ? 'Reverse' : 'Remove'}
-                        </button>
-                      ) : (
-                        <span className="text-text-muted text-xs">—</span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-            <tfoot className="text-text border-t border-border font-medium">
-              <tr>
-                <td colSpan={2} className="py-2 px-2 text-right">Invoice payments</td>
-                <td className="col-amount py-2 px-2">
-                  ${payments.filter((r) => r.payment_type === 'invoice').reduce((sum, r) => sum + Number(r.amount), 0).toFixed(2)}
-                </td>
-                <td colSpan={5} />
-              </tr>
-              <tr>
-                <td colSpan={2} className="py-2 px-2 text-right">Deposits</td>
-                <td className="col-amount py-2 px-2">
-                  ${payments.filter((r) => r.payment_type === 'deposit').reduce((sum, r) => sum + Number(r.amount), 0).toFixed(2)}
-                </td>
-                <td colSpan={5} />
-              </tr>
-              <tr>
-                <td colSpan={2} className="py-2 px-2 text-right">Total</td>
-                <td className="col-amount py-2 px-2">
-                  ${payments.reduce((sum, r) => sum + Number(r.amount), 0).toFixed(2)}
-                </td>
-                <td colSpan={5} />
-              </tr>
-            </tfoot>
-          </table>
+                          '—'
+                        )}
+                      </td>
+                      <td>
+                        {row.payment_type === 'invoice' && row.invoice_number && (
+                          <button
+                            type="button"
+                            className="link-primary text-sm font-mono"
+                            onClick={() => navigate(`/invoices/${row.invoice_id}`)}
+                          >
+                            {row.invoice_number}
+                          </button>
+                        )}
+                        {row.payment_type === 'deposit' &&
+                          (row.applied_invoice_number ? (
+                            <span className="text-text-muted text-sm">
+                              Applied to{' '}
+                              <button
+                                type="button"
+                                className="link-primary font-mono"
+                                onClick={() => navigate(`/invoices/${row.applied_to_invoice_id}`)}
+                              >
+                                {row.applied_invoice_number}
+                              </button>
+                            </span>
+                          ) : (
+                            <span className="text-text-muted text-sm">Unapplied</span>
+                          ))}
+                        {row.payment_type === 'invoice' && !row.invoice_number && '—'}
+                      </td>
+                      <td>
+                        {canReverse ? (
+                          <button
+                            type="button"
+                            className="btn-secondary text-sm py-1 px-2 min-h-0 text-red-400 border-red-500/50 hover:border-red-500"
+                            onClick={() => handleReverse(row)}
+                            disabled={!!isReversing}
+                          >
+                            {isReversing ? 'Reversing…' : row.payment_type === 'invoice' ? 'Reverse' : 'Remove'}
+                          </button>
+                        ) : (
+                          <span className="text-text-muted text-xs">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot className="text-text border-t border-border font-medium">
+                <tr>
+                  <td colSpan={2} className="py-2 px-2 text-right">Invoice payments</td>
+                  <td className="col-amount py-2 px-2">
+                    ${payments.filter((r) => r.payment_type === 'invoice').reduce((sum, r) => sum + Number(r.amount), 0).toFixed(2)}
+                  </td>
+                  <td colSpan={5} />
+                </tr>
+                <tr>
+                  <td colSpan={2} className="py-2 px-2 text-right">Deposits</td>
+                  <td className="col-amount py-2 px-2">
+                    ${payments.filter((r) => r.payment_type === 'deposit').reduce((sum, r) => sum + Number(r.amount), 0).toFixed(2)}
+                  </td>
+                  <td colSpan={5} />
+                </tr>
+                <tr>
+                  <td colSpan={2} className="py-2 px-2 text-right">Total</td>
+                  <td className="col-amount py-2 px-2">
+                    ${payments.reduce((sum, r) => sum + Number(r.amount), 0).toFixed(2)}
+                  </td>
+                  <td colSpan={5} />
+                </tr>
+              </tfoot>
+            </ResizableTable>
           )}
         />
         <div className="md:hidden mt-4 detail-card space-y-2 text-sm">

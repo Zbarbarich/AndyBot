@@ -11,7 +11,7 @@ Field service and asset management ERP for IT, construction, electrical, securit
 | Data access | `pg` (node-postgres) |
 | Auth | JWT, bcrypt |
 | PDFs | PDFKit |
-| Database | PostgreSQL 16 (SQL migrations `000`–`021`) |
+| Database | PostgreSQL 16 (SQL migrations `000`–`022`) |
 | Local orchestration | npm workspaces via root scripts, `concurrently` |
 | Production | Docker Compose, Caddy reverse proxy, GitHub Actions deploy workflow |
 
@@ -27,7 +27,7 @@ Field service and asset management ERP for IT, construction, electrical, securit
 │   ├── order-service/        # Port 3005
 │   ├── invoice-service/      # Port 3006
 │   ├── pdf-service/          # Port 3007
-│   ├── shared/schema/        # SQL migrations 000–021
+│   ├── shared/schema/        # SQL migrations 000–022
 │   └── scripts/              # setup-env, migrations, create-first-user
 ├── deploy/                   # Production and local Postgres Compose files
 ├── docs/                     # Onboarding and changelog
@@ -119,11 +119,13 @@ Longer notes and troubleshooting: [docs/ONBOARDING.md](docs/ONBOARDING.md).
 
 ## Application overview
 
-- Dashboard with KPIs and revenue chart
-- Customers, tickets (with attachments), quotes and orders, invoices and payments
+- Dashboard Overview: A/R, month-to-date revenue, open POs (unpurchased items), stale tickets; plus KPI cards for open orders/quotes/invoices/tickets
+- Customers, tickets (with attachments), quotes and orders, invoices, payments, and deposits
+- Quote/order line items: SKU search autocomplete (`GET /api/app/items/search`); default tax rate 6%
 - Purchasing (purchase orders), item catalog
-- PDF export for quotes, orders, invoices, and purchase orders
-- Dark and light themes with glass-style UI surfaces
+- PDF export for quotes, orders, invoices, and purchase orders (deposits on order PDFs; payment refs on invoices; company identity from env)
+- Dark and light themes, soft glass UI, sticky sidebar, and per-user table column preferences
+- Dates shown as MM-DD-YY in the UI and on PDFs (Eastern timezone)
 
 ## Ports
 

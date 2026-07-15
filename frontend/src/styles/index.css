@@ -11,21 +11,17 @@
     --color-text: #1b1b1b;
     --color-text-muted: #777676;
     --background-color: #eef2f4;
-    /* More translucent so backdrop blur reads as glass in light mode */
-    --glass-bg: color-mix(in srgb, #ffffff 46%, transparent);
-    --glass-bg-strong: color-mix(in srgb, #ffffff 58%, transparent);
-    --glass-border: rgba(255, 255, 255, 0.72);
-    --glass-border-inner: rgba(255, 255, 255, 0.55);
-    --glass-highlight: rgba(106, 239, 230, 0.18);
+    /* Frosted glass — translucent enough to read as glass; smooth via soft blur/wash */
+    --glass-bg: color-mix(in srgb, #ffffff 38%, transparent);
+    --glass-bg-strong: color-mix(in srgb, #ffffff 50%, transparent);
+    --glass-border: rgba(255, 255, 255, 0.55);
+    --glass-border-inner: rgba(255, 255, 255, 0.35);
+    --glass-highlight: rgba(106, 239, 230, 0.12);
     --glass-shadow:
-      0 0 0 1px rgba(34, 212, 204, 0.12),
-      inset 0 1px 0 0 rgba(255, 255, 255, 0.75),
-      inset 0 -1px 0 0 rgba(34, 212, 204, 0.06),
-      0 10px 32px rgba(27, 40, 50, 0.08),
-      0 0 40px rgba(34, 212, 204, 0.07),
-      0 0 48px rgba(139, 88, 195, 0.05);
-    --glass-blur: 22px;
-    --glass-blur-strong: 32px;
+      0 0 0 1px rgba(34, 212, 204, 0.08),
+      0 8px 24px rgba(27, 40, 50, 0.06);
+    --glass-blur: 18px;
+    --glass-blur-strong: 24px;
   }
 
   .dark {
@@ -36,18 +32,16 @@
     --color-text: #f7fafc;
     --color-text-muted: #a0aec0;
     --background-color: #12171f;
-    --glass-bg: color-mix(in srgb, #243044 42%, transparent);
-    --glass-bg-strong: color-mix(in srgb, #2a364c 55%, transparent);
-    --glass-border: rgba(255, 255, 255, 0.12);
-    --glass-border-inner: rgba(255, 255, 255, 0.08);
-    --glass-highlight: rgba(106, 239, 230, 0.16);
+    --glass-bg: color-mix(in srgb, #1c2430 36%, transparent);
+    --glass-bg-strong: color-mix(in srgb, #1c2430 48%, transparent);
+    --glass-border: rgba(255, 255, 255, 0.1);
+    --glass-border-inner: rgba(255, 255, 255, 0.06);
+    --glass-highlight: rgba(106, 239, 230, 0.1);
     --glass-shadow:
-      0 0 0 1px rgba(34, 212, 204, 0.14),
-      inset 0 1px 0 0 rgba(255, 255, 255, 0.08),
-      0 18px 50px rgba(0, 0, 0, 0.45),
-      0 0 48px rgba(139, 88, 195, 0.1);
-    --glass-blur: 22px;
-    --glass-blur-strong: 32px;
+      0 0 0 1px rgba(34, 212, 204, 0.1),
+      0 10px 28px rgba(0, 0, 0, 0.35);
+    --glass-blur: 14px;
+    --glass-blur-strong: 18px;
   }
 
   html {
@@ -58,19 +52,20 @@
     @apply font-sans antialiased min-w-[320px] overflow-x-hidden h-full;
     @apply bg-bg text-text transition-colors duration-300;
     background-image:
-      radial-gradient(ellipse 90% 55% at 10% 6%, rgba(34, 212, 204, 0.16), transparent 52%),
-      radial-gradient(ellipse 70% 50% at 90% 14%, rgba(139, 88, 195, 0.1), transparent 50%),
-      radial-gradient(ellipse 55% 40% at 48% 100%, rgba(106, 239, 230, 0.1), transparent 55%);
-    background-attachment: fixed;
+      radial-gradient(ellipse 90% 55% at 10% 6%, rgba(34, 212, 204, 0.11), transparent 55%),
+      radial-gradient(ellipse 70% 50% at 90% 14%, rgba(139, 88, 195, 0.07), transparent 55%),
+      radial-gradient(ellipse 55% 40% at 48% 100%, rgba(106, 239, 230, 0.06), transparent 58%);
+    /* Scroll (not fixed): blur over fixed gradients bands in light mode */
+    background-attachment: scroll;
   }
 
   .dark body,
   body.dark,
   html.dark body {
     background-image:
-      radial-gradient(ellipse 90% 55% at 12% 8%, rgba(34, 212, 204, 0.13), transparent 52%),
-      radial-gradient(ellipse 70% 50% at 88% 18%, rgba(139, 88, 195, 0.12), transparent 50%),
-      radial-gradient(ellipse 60% 45% at 50% 100%, rgba(106, 239, 230, 0.07), transparent 55%);
+      radial-gradient(ellipse 90% 55% at 12% 8%, rgba(34, 212, 204, 0.07), transparent 55%),
+      radial-gradient(ellipse 70% 50% at 88% 18%, rgba(139, 88, 195, 0.06), transparent 55%),
+      radial-gradient(ellipse 60% 45% at 50% 100%, rgba(106, 239, 230, 0.04), transparent 58%);
     background-attachment: fixed;
   }
 
@@ -106,24 +101,117 @@
     @apply rounded-xl border;
     background-color: var(--glass-bg);
     border-color: var(--glass-border);
-    backdrop-filter: blur(var(--glass-blur)) saturate(1.55);
-    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.55);
+    backdrop-filter: blur(var(--glass-blur)) saturate(1.12);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.12);
     box-shadow: var(--glass-shadow);
     background-image: linear-gradient(
-      135deg,
-      rgba(255, 255, 255, 0.55) 0%,
-      rgba(255, 255, 255, 0.18) 38%,
-      rgba(106, 239, 230, 0.06) 62%,
-      transparent 100%
+      180deg,
+      rgba(255, 255, 255, 0.22) 0%,
+      rgba(255, 255, 255, 0.18) 20%,
+      rgba(255, 255, 255, 0.14) 40%,
+      rgba(255, 255, 255, 0.1) 60%,
+      rgba(255, 255, 255, 0.07) 80%,
+      rgba(255, 255, 255, 0.04) 100%
     );
+  }
+
+  /* Light: white fade + soft teal bloom (radial reads more gaussian than a hard stop) */
+  :root:not(.dark) .glass-card {
+    background-color: color-mix(in srgb, #ffffff 42%, transparent);
+    border-color: rgba(255, 255, 255, 0.72);
+    box-shadow:
+      0 0 0 1px rgba(34, 212, 204, 0.1),
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.5),
+      0 10px 28px rgba(27, 40, 50, 0.07);
+    backdrop-filter: blur(18px) saturate(1.15);
+    -webkit-backdrop-filter: blur(18px) saturate(1.15);
+    background-image:
+      linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.5) 0%,
+        rgba(255, 255, 255, 0.42) 16%,
+        rgba(255, 255, 255, 0.32) 34%,
+        rgba(255, 255, 255, 0.22) 52%,
+        rgba(255, 255, 255, 0.14) 68%,
+        rgba(255, 255, 255, 0.09) 82%,
+        rgba(255, 255, 255, 0.06) 100%
+      ),
+      radial-gradient(
+        ellipse 170% 120% at 50% 125%,
+        rgba(160, 245, 238, 0.1) 0%,
+        rgba(140, 242, 234, 0.055) 28%,
+        rgba(120, 238, 230, 0.025) 50%,
+        rgba(106, 239, 230, 0.01) 70%,
+        transparent 100%
+      );
+  }
+
+  :root:not(.dark) .glass-panel,
+  :root:not(.dark) .glass-section {
+    background-color: color-mix(in srgb, #ffffff 48%, transparent);
+    border-color: rgba(255, 255, 255, 0.75);
+    box-shadow:
+      0 0 0 1px rgba(34, 212, 204, 0.1),
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.52),
+      0 12px 32px rgba(27, 40, 50, 0.08);
+    backdrop-filter: blur(22px) saturate(1.18);
+    -webkit-backdrop-filter: blur(22px) saturate(1.18);
+    background-image:
+      linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.54) 0%,
+        rgba(255, 255, 255, 0.45) 16%,
+        rgba(255, 255, 255, 0.34) 34%,
+        rgba(255, 255, 255, 0.24) 52%,
+        rgba(255, 255, 255, 0.16) 68%,
+        rgba(255, 255, 255, 0.11) 82%,
+        rgba(255, 255, 255, 0.07) 100%
+      ),
+      radial-gradient(
+        ellipse 175% 125% at 50% 128%,
+        rgba(160, 245, 238, 0.11) 0%,
+        rgba(140, 242, 234, 0.06) 26%,
+        rgba(120, 238, 230, 0.028) 48%,
+        rgba(106, 239, 230, 0.01) 68%,
+        transparent 100%
+      );
+  }
+
+  :root:not(.dark) .table-scroll {
+    background-color: color-mix(in srgb, #ffffff 40%, transparent);
+    backdrop-filter: blur(14px) saturate(1.1);
+    -webkit-backdrop-filter: blur(14px) saturate(1.1);
+    background-image:
+      linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.34) 0%,
+        rgba(255, 255, 255, 0.24) 30%,
+        rgba(255, 255, 255, 0.15) 60%,
+        rgba(255, 255, 255, 0.1) 100%
+      ),
+      radial-gradient(
+        ellipse 160% 100% at 50% 122%,
+        rgba(160, 245, 238, 0.07) 0%,
+        rgba(140, 242, 234, 0.035) 40%,
+        rgba(106, 239, 230, 0.01) 65%,
+        transparent 100%
+      );
+  }
+
+  :root:not(.dark) .app-header,
+  :root:not(.dark) .app-sidebar {
+    backdrop-filter: blur(20px) saturate(1.12);
+    -webkit-backdrop-filter: blur(20px) saturate(1.12);
   }
 
   .dark .glass-card {
     background-image: linear-gradient(
-      135deg,
-      rgba(255, 255, 255, 0.06) 0%,
-      rgba(255, 255, 255, 0.02) 40%,
-      transparent 70%
+      180deg,
+      rgba(255, 255, 255, 0.04) 0%,
+      rgba(255, 255, 255, 0.032) 25%,
+      rgba(255, 255, 255, 0.022) 50%,
+      rgba(255, 255, 255, 0.012) 75%,
+      transparent 100%
     );
   }
 
@@ -131,26 +219,28 @@
     @apply rounded-2xl border;
     background-color: var(--glass-bg-strong);
     border-color: var(--glass-border);
-    backdrop-filter: blur(var(--glass-blur-strong)) saturate(1.6);
-    -webkit-backdrop-filter: blur(var(--glass-blur-strong)) saturate(1.6);
+    backdrop-filter: blur(var(--glass-blur-strong)) saturate(1.1);
+    -webkit-backdrop-filter: blur(var(--glass-blur-strong)) saturate(1.1);
     box-shadow: var(--glass-shadow);
     background-image: linear-gradient(
-      160deg,
-      rgba(255, 255, 255, 0.62) 0%,
-      rgba(255, 255, 255, 0.22) 28%,
-      rgba(106, 239, 230, 0.07) 52%,
-      rgba(139, 88, 195, 0.04) 72%,
-      transparent 100%
+      180deg,
+      rgba(255, 255, 255, 0.2) 0%,
+      rgba(255, 255, 255, 0.16) 20%,
+      rgba(255, 255, 255, 0.12) 40%,
+      rgba(255, 255, 255, 0.09) 60%,
+      rgba(255, 255, 255, 0.06) 80%,
+      rgba(255, 255, 255, 0.04) 100%
     );
   }
 
   .dark .glass-panel {
     background-image: linear-gradient(
-      160deg,
-      rgba(255, 255, 255, 0.08) 0%,
-      rgba(106, 239, 230, 0.04) 28%,
-      rgba(139, 88, 195, 0.03) 55%,
-      transparent 75%
+      180deg,
+      rgba(255, 255, 255, 0.048) 0%,
+      rgba(255, 255, 255, 0.034) 25%,
+      rgba(255, 255, 255, 0.022) 50%,
+      rgba(255, 255, 255, 0.012) 75%,
+      transparent 100%
     );
   }
 
@@ -199,6 +289,13 @@
   .dark .btn-secondary:hover {
     background-color: color-mix(in srgb, #3f4f63 60%, transparent);
     border-color: rgba(106, 239, 230, 0.25);
+  }
+
+  .btn-danger {
+    @apply text-white px-4 py-2.5 rounded-full
+           bg-red-600 hover:bg-red-700
+           transition-colors duration-300 disabled:opacity-50 disabled:cursor-not-allowed
+           font-medium min-h-[44px] inline-flex items-center justify-center gap-2;
   }
 
   .btn-doc-action {
@@ -263,7 +360,7 @@
   }
 
   .input-field-compact {
-    @apply min-h-[44px] py-2 px-3 pl-9 text-sm;
+    @apply min-h-0 h-7 py-1 px-3 pl-9 text-sm;
   }
 
   .pill-button {
@@ -357,6 +454,73 @@
     -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.25);
     box-shadow: var(--glass-shadow);
     -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+  }
+
+  .table-scroll.is-scrolling {
+    scrollbar-color: rgba(34, 212, 204, 0.45) transparent;
+  }
+
+  .dark .table-scroll.is-scrolling {
+    scrollbar-color: rgba(139, 88, 195, 0.5) transparent;
+  }
+
+  .table-scroll::-webkit-scrollbar {
+    height: 6px;
+    width: 6px;
+  }
+
+  .table-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .table-scroll::-webkit-scrollbar-thumb {
+    background-color: transparent;
+    border-radius: 999px;
+    transition: background-color 0.25s ease;
+  }
+
+  .table-scroll.is-scrolling::-webkit-scrollbar-thumb {
+    background-color: rgba(34, 212, 204, 0.45);
+  }
+
+  .dark .table-scroll.is-scrolling::-webkit-scrollbar-thumb {
+    background-color: rgba(139, 88, 195, 0.5);
+  }
+
+  .document-toolbar {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+  }
+
+  .document-toolbar.is-scrolling {
+    scrollbar-color: rgba(34, 212, 204, 0.45) transparent;
+  }
+
+  .dark .document-toolbar.is-scrolling {
+    scrollbar-color: rgba(139, 88, 195, 0.5) transparent;
+  }
+
+  .document-toolbar::-webkit-scrollbar {
+    height: 6px;
+  }
+
+  .document-toolbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .document-toolbar::-webkit-scrollbar-thumb {
+    background-color: transparent;
+    border-radius: 999px;
+  }
+
+  .document-toolbar.is-scrolling::-webkit-scrollbar-thumb {
+    background-color: rgba(34, 212, 204, 0.45);
+  }
+
+  .dark .document-toolbar.is-scrolling::-webkit-scrollbar-thumb {
+    background-color: rgba(139, 88, 195, 0.5);
   }
 
   .dark .table-scroll {
@@ -481,6 +645,21 @@
     @apply min-h-[36px] py-1.5 px-2 text-sm;
   }
 
+  /* Light mode: quieter row rules on order / PO line tables */
+  :root:not(.dark) .line-items-compact tr {
+    border-color: rgba(27, 40, 50, 0.07);
+  }
+
+  :root:not(.dark) .line-items-compact th {
+    border-color: rgba(27, 40, 50, 0.1);
+  }
+
+  :root:not(.dark) .line-items-compact.table-scroll {
+    background-color: color-mix(in srgb, #ffffff 36%, transparent);
+    border-color: rgba(255, 255, 255, 0.55);
+    box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.45);
+  }
+
   @media (max-width: 767px) {
     .line-items-compact table {
       @apply min-w-[28rem] text-xs;
@@ -519,6 +698,24 @@
   .document-toolbar {
     @apply glass-panel p-3 sm:p-4 flex flex-nowrap sm:flex-wrap gap-2 overflow-x-auto;
     -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+  }
+
+  .document-field-grid {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-4;
+  }
+
+  .document-field-span-4 { @apply min-w-0 max-w-full lg:col-span-4; }
+  .document-field-span-6 { @apply min-w-0 max-w-full sm:col-span-2 lg:col-span-6; }
+  .document-field-span-8 { @apply min-w-0 max-w-full lg:col-span-8; }
+  .document-field-span-12 { @apply col-span-full min-w-0 max-w-full; }
+
+  .document-field-span-4 input[type='date'],
+  .document-field-span-6 input[type='date'],
+  .document-field-span-8 input[type='date'],
+  .document-field-span-12 input[type='date'] {
+    @apply max-w-full min-w-0 w-full;
   }
 
   .attachment-grid {
@@ -547,15 +744,6 @@
            flex flex-col items-center justify-center gap-2 cursor-pointer
            transition-colors duration-200 text-text-muted hover:text-primary;
   }
-
-  .document-field-grid {
-    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-4;
-  }
-
-  .document-field-span-4 { @apply lg:col-span-4; }
-  .document-field-span-6 { @apply sm:col-span-2 lg:col-span-6; }
-  .document-field-span-8 { @apply lg:col-span-8; }
-  .document-field-span-12 { @apply col-span-full; }
 
   .nav-link {
     @apply block w-full py-2.5 px-4 text-left text-text hover:text-primary
@@ -618,52 +806,63 @@
   }
 
   .app-header {
-    @apply sticky top-0 z-40 border-b;
-    border-color: var(--glass-border);
+    @apply sticky top-0 z-40;
     background-color: var(--glass-bg-strong);
-    backdrop-filter: blur(var(--glass-blur-strong)) saturate(1.55);
-    -webkit-backdrop-filter: blur(var(--glass-blur-strong)) saturate(1.55);
+    backdrop-filter: blur(var(--glass-blur-strong)) saturate(1.08);
+    -webkit-backdrop-filter: blur(var(--glass-blur-strong)) saturate(1.08);
     background-image: linear-gradient(
       180deg,
-      rgba(255, 255, 255, 0.55) 0%,
-      rgba(255, 255, 255, 0.12) 100%
+      rgba(255, 255, 255, 0.28) 0%,
+      rgba(255, 255, 255, 0.22) 25%,
+      rgba(255, 255, 255, 0.15) 50%,
+      rgba(255, 255, 255, 0.1) 75%,
+      rgba(255, 255, 255, 0.06) 100%
     );
-    box-shadow:
-      0 1px 0 0 var(--glass-border-inner),
-      0 8px 28px rgba(27, 40, 50, 0.06),
-      0 0 24px rgba(34, 212, 204, 0.05);
+    /* Soft ambient only — no extra 1px hairline (that doubled the light-mode edge) */
+    box-shadow: 0 4px 16px rgba(27, 40, 50, 0.04);
   }
 
   .dark .app-header {
     background-image: linear-gradient(
       180deg,
-      rgba(255, 255, 255, 0.06) 0%,
+      rgba(255, 255, 255, 0.04) 0%,
+      rgba(255, 255, 255, 0.024) 40%,
+      rgba(255, 255, 255, 0.01) 75%,
       transparent 100%
     );
-    box-shadow:
-      0 1px 0 0 rgba(255, 255, 255, 0.06),
-      0 8px 24px rgba(0, 0, 0, 0.25);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+  }
+
+  /* Shared chrome height + single bottom edge for sidebar brand and top nav */
+  .app-topbar {
+    height: 2.625rem; /* 42px */
+    max-height: 2.625rem;
+    @apply shrink-0 box-border border-b;
+    border-color: var(--color-border);
   }
 
   .app-sidebar {
     background-color: var(--glass-bg-strong);
-    backdrop-filter: blur(var(--glass-blur-strong)) saturate(1.5);
-    -webkit-backdrop-filter: blur(var(--glass-blur-strong)) saturate(1.5);
+    backdrop-filter: blur(var(--glass-blur-strong)) saturate(1.08);
+    -webkit-backdrop-filter: blur(var(--glass-blur-strong)) saturate(1.08);
     border-color: var(--glass-border);
     background-image: linear-gradient(
       180deg,
-      rgba(255, 255, 255, 0.5) 0%,
-      rgba(255, 255, 255, 0.12) 35%,
-      rgba(106, 239, 230, 0.05) 100%
+      rgba(255, 255, 255, 0.26) 0%,
+      rgba(255, 255, 255, 0.2) 25%,
+      rgba(255, 255, 255, 0.14) 50%,
+      rgba(255, 255, 255, 0.09) 75%,
+      rgba(255, 255, 255, 0.05) 100%
     );
   }
 
   .dark .app-sidebar {
     background-image: linear-gradient(
       180deg,
-      rgba(255, 255, 255, 0.05) 0%,
-      transparent 30%,
-      rgba(139, 88, 195, 0.04) 100%
+      rgba(255, 255, 255, 0.038) 0%,
+      rgba(255, 255, 255, 0.022) 40%,
+      rgba(255, 255, 255, 0.01) 75%,
+      transparent 100%
     );
   }
 }
@@ -679,4 +878,33 @@ button.btn-icon-primary {
   .hide-on-mobile { display: none; }
   .stack-on-mobile { flex-direction: column; }
   .full-width-on-mobile { width: 100%; }
+}
+
+/* Route change: content springs in at the top (window scroll; body fixed bg parallax stays) */
+@keyframes page-bounce-in {
+  0% {
+    opacity: 0.55;
+    transform: translateY(28px);
+  }
+  55% {
+    opacity: 1;
+    transform: translateY(-8px);
+  }
+  75% {
+    transform: translateY(4px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.page-bounce-in {
+  animation: page-bounce-in 0.65s cubic-bezier(0.34, 1.4, 0.64, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-bounce-in {
+    animation: none !important;
+  }
 }

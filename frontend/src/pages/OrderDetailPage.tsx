@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { TicketSelector } from '../components/TicketSelector';
+import { ItemSkuSelector, type ItemSkuOption } from '../components/ItemSkuSelector';
 import FormSection from '../components/FormSection';
 import StickyFormActions from '../components/StickyFormActions';
 import { LineItemEditor } from '../components/LineItemEditor';
@@ -12,6 +13,8 @@ import DocumentToolbar from '../components/document/DocumentToolbar';
 import DocumentFieldGrid, { DocumentFieldSpan } from '../components/document/DocumentFieldGrid';
 import DocumentTotalsPanel from '../components/document/DocumentTotalsPanel';
 import DocumentStatusBadge from '../components/document/DocumentStatusBadge';
+import { useConfirm } from '../components/GlassConfirmDialog';
+import { useToast } from '../context/ToastContext';
 import { authFetch } from '../api/client';
 import { apiBase } from '../api/config';
 import { formatDate } from '../utils/formatDate';
@@ -19,21 +22,10 @@ import { formatDate } from '../utils/formatDate';
 const ORDERS_API = `${apiBase}/api/app/orders`;
 const QUOTES_API = `${apiBase}/api/app/quotes`;
 const CUSTOMERS_API = `${apiBase}/api/app/customers`;
-const ITEMS_API = `${apiBase}/api/app/items`;
 
 interface Customer {
   id: number;
   name: string;
-}
-
-interface Item {
-  id: number;
-  sku: string;
-  name: string;
-  unit_price: number;
-  taxable: boolean;
-  stock?: number;
-  our_cost?: number;
 }
 
 type BillingStatus = 'pending' | 'billable' | 'invoiced';
@@ -121,9 +113,10 @@ const emptyLine = (): LineRow => ({
 const OrderDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { success, error: toastError } = useToast();
+  const { confirm } = useConfirm();
   const isNew = id === 'new';
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [items, setItems] = useState<Item[]>([]);
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -149,7 +142,7 @@ const OrderDetailPage = () => {
     order_date: '',
     notes: '',
     customer_po_number: '',
-    tax_rate: '0.08',
+    tax_rate: '0.06',
     shipping_amount: '0',
   });
   const [createPurchaseOrder, setCreatePurchaseOrder] = useState(false);
@@ -170,13 +163,6 @@ const OrderDetailPage = () => {
     setCustomers(data);
   }, []);
 
-  const fetchItems = useCallback(async () => {
-    const res = await authFetch(ITEMS_API);
-    if (!res.ok) return;
-    const data = await res.json();
-    setItems(data);
-  }, []);
-
   const fetchOrder = useCallback(async (orderId: number) => {
     const res = await authFetch(`${ORDERS_API}/${orderId}`);
     if (!res.ok) return null;
@@ -189,7 +175,6 @@ const OrderDetailPage = () => {
       setLoading(true);
       setError('');
       await fetchCustomers();
-      await fetchItems();
       if (isNew) {
         setIsReadOnly(false);
         setForm({
@@ -201,7 +186,7 @@ const OrderDetailPage = () => {
           order_date: new Date().toISOString().slice(0, 10),
           notes: '',
           customer_po_number: '',
-          tax_rate: '0.08',
+          tax_rate: '0.06',
           shipping_amount: '0',
         });
         setCreatePurchaseOrder(false);
@@ -267,14 +252,21 @@ const OrderDetailPage = () => {
     return () => {
       cancelled = true;
     };
-  }, [id, isNew, fetchOrder, fetchCustomers, fetchItems]);
+  }, [id, isNew, fetchOrder, fetchCustomers]);
 
   const fetchDeposits = useCallback(async (orderId: number) => {
-    const res = await authFetch(`${ORDERS_API}/${orderId}/deposits`);
-    if (!res.ok) return;
-    const data = await res.json();
-    setDeposits(data);
-  }, []);
+    try {
+      const res = await authFetch(`${ORDERS_API}/${orderId}/deposits`);
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to load deposits');
+      }
+      const data = await res.json();
+      setDeposits(data);
+    } catch (e) {
+      toastError(e instanceof Error ? e.message : 'Failed to load deposits');
+    }
+  }, [toastError]);
 
   useEffect(() => {
     if (!order?.id || order.type !== 'order') return;
@@ -356,6 +348,7 @@ const OrderDetailPage = () => {
           });
           const data = await res.json().catch(() => ({}));
           if (!res.ok) throw new Error(data.error || 'Failed to create quote');
+          success('Quote created');
           navigate(`/orders/${data.id}`);
         } else {
           const res = await authFetch(ORDERS_API, {
@@ -379,6 +372,7 @@ const OrderDetailPage = () => {
           });
           const data = await res.json().catch(() => ({}));
           if (!res.ok) throw new Error(data.error || 'Failed to create document');
+          success(form.docType === 'return' ? 'Return created' : 'Order created');
           navigate(`/orders/${data.id}`);
         }
         return;
@@ -393,6 +387,7 @@ const OrderDetailPage = () => {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Failed to update document');
+      success(isQuote ? 'Quote saved' : 'Order saved');
       setOrder({ ...order!, ...data });
       if (data.lines && data.lines.length > 0) {
         const newLines: LineRow[] = data.lines.map((l: LineRow & { item_sku?: string; item_name?: string; unit_of_measure?: string | null; item_unit_of_measure?: string | null; quantity_billed?: number; invoiced_on?: InvoicedOnRow[]; on_purchase_orders?: OnPurchaseOrderRow[] }, i: number) => ({
@@ -418,7 +413,9 @@ const OrderDetailPage = () => {
       }
       setIsReadOnly(true);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Request failed');
+      const msg = e instanceof Error ? e.message : 'Request failed';
+      setError(msg);
+      toastError(msg);
     } finally {
       setSaving(false);
     }
@@ -520,26 +517,43 @@ const OrderDetailPage = () => {
     setLines((prev) => {
       const next = [...prev];
       next[index] = { ...next[index], [field]: value };
-      if (field === 'item_id' && value != null) {
-        const item = items.find((i) => i.id === Number(value));
-        if (item) {
-          next[index].unit_price = item.unit_price;
-          next[index].description = item.name;
-          if (next[index].po_unit_cost === undefined && item.our_cost != null) next[index].po_unit_cost = item.our_cost;
-        }
-      }
       return next;
     });
-    if (field === 'item_id' && value != null) {
-      const item = items.find((i) => i.id === Number(value));
-      if (item) {
-        setUnitPriceDisplay((prev) => {
-          const next = [...prev];
-          while (next.length <= index) next.push('');
-          next[index] = String(item.unit_price);
-          return next;
-        });
+  };
+
+  const applyItemToLine = (index: number, item: ItemSkuOption | null) => {
+    setLines((prev) => {
+      const next = [...prev];
+      if (!item) {
+        next[index] = {
+          ...next[index],
+          item_id: null,
+          item_sku: undefined,
+          item_name: undefined,
+        };
+        return next;
       }
+      next[index] = {
+        ...next[index],
+        item_id: item.id,
+        item_sku: item.sku,
+        item_name: item.name,
+        unit_price: Number(item.unit_price),
+        description: item.name,
+        unit_of_measure: item.unit_of_measure || next[index].unit_of_measure || 'EA',
+        ...(next[index].po_unit_cost === undefined && item.our_cost != null
+          ? { po_unit_cost: Number(item.our_cost) }
+          : {}),
+      };
+      return next;
+    });
+    if (item) {
+      setUnitPriceDisplay((prev) => {
+        const next = [...prev];
+        while (next.length <= index) next.push('');
+        next[index] = String(item.unit_price);
+        return next;
+      });
     }
   };
 
@@ -597,7 +611,11 @@ const OrderDetailPage = () => {
 
   const handleCancelQuote = async () => {
     if (!order || order.type !== 'quote' || order.status === 'converted' || order.status === 'closed') return;
-    if (!window.confirm('Cancel this quote? It will be marked closed and can no longer be converted to an order.')) return;
+    if (!(await confirm({
+      message: 'Cancel this quote? It will be marked closed and can no longer be converted to an order.',
+      danger: true,
+      confirmLabel: 'Cancel quote',
+    }))) return;
     setCancellingQuote(true);
     setError('');
     try {
@@ -607,8 +625,11 @@ const OrderDetailPage = () => {
       setOrder({ ...order, ...data, lines: data.lines ?? order.lines });
       setForm((f) => ({ ...f, status: data.status ?? 'closed' }));
       setIsReadOnly(true);
+      success('Quote cancelled');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to cancel quote');
+      const msg = e instanceof Error ? e.message : 'Failed to cancel quote';
+      setError(msg);
+      toastError(msg);
     } finally {
       setCancellingQuote(false);
     }
@@ -709,9 +730,12 @@ const OrderDetailPage = () => {
                     });
                     const data = await res.json().catch(() => ({}));
                     if (!res.ok) throw new Error(data.error || 'Failed to convert');
+                    success('Converted to order');
                     navigate(`/orders/${data.id}`);
                   } catch (e) {
-                    setError(e instanceof Error ? e.message : 'Failed to convert to order');
+                    const msg = e instanceof Error ? e.message : 'Failed to convert to order';
+                    setError(msg);
+                    toastError(msg);
                   }
                 }}
                 className="btn-doc-action text-sm"
@@ -743,9 +767,12 @@ const OrderDetailPage = () => {
                   });
                   const data = await res.json().catch(() => ({}));
                   if (!res.ok) throw new Error(data.error || 'Failed to create invoice');
+                  success('Invoice created');
                   navigate(`/invoices/${data.id}`);
                 } catch (e) {
-                  setError(e instanceof Error ? e.message : 'Failed to create invoice');
+                  const msg = e instanceof Error ? e.message : 'Failed to create invoice';
+                  setError(msg);
+                  toastError(msg);
                 } finally {
                   setCreatingInvoice(false);
                 }
@@ -892,7 +919,7 @@ const OrderDetailPage = () => {
                   />
                 </DocumentFieldSpan>
               )}
-              <DocumentFieldSpan span={4}>
+              <DocumentFieldSpan span={4} className="col-span-full lg:col-span-4">
                 <label className="block text-sm font-medium text-text-muted mb-1">Order date</label>
                 <input
                   type="date"
@@ -961,22 +988,18 @@ const OrderDetailPage = () => {
                     const extendedCost = line.quantity * line.unit_price;
                     return (
                     <tr key={idx} className="border-t border-border">
-                      <td className="py-1.5 px-2 font-mono whitespace-nowrap align-top">
-                        <select
-                          value={line.item_id ?? ''}
-                          onChange={(e) =>
-                            updateLine(idx, 'item_id', e.target.value ? parseInt(e.target.value, 10) : null)
-                          }
-                          className="input-field py-1.5 px-2 text-sm min-h-0 w-full max-w-[140px]"
-                          disabled={readOnly}
-                        >
-                          <option value="">— Ad-hoc —</option>
-                          {items.map((it) => (
-                            <option key={it.id} value={it.id}>
-                              {it.sku}
-                            </option>
-                          ))}
-                        </select>
+                      <td className="py-1.5 px-2 whitespace-nowrap align-top">
+                        {readOnly ? (
+                          <span className="font-mono text-sm">{line.item_sku || '—'}</span>
+                        ) : (
+                          <ItemSkuSelector
+                            itemId={line.item_id}
+                            sku={line.item_sku}
+                            onSelect={(item) => applyItemToLine(idx, item)}
+                            className="w-full max-w-[160px]"
+                            inputClassName="py-1.5 px-2 text-sm min-h-0 w-full"
+                          />
+                        )}
                       </td>
                       <td className="py-1.5 px-2 align-top min-w-[120px]">
                         <input
@@ -1165,24 +1188,28 @@ const OrderDetailPage = () => {
                 <p className="text-xs text-text-muted border-t border-border pt-2 mt-2">
                   Orders close when all items are invoiced. To cancel, set line prices to 0 and create a zero-balance invoice.
                 </p>
-                {order.type === 'order' && deposits.length > 0 && (
+                {order.type === 'order' && (
                   <div className="border-t border-border pt-3 mt-3">
                     <h3 className="text-sm font-medium text-text mb-2">Deposits</h3>
-                    <ul className="space-y-1.5">
-                      {deposits.map((d) => (
-                        <li key={d.id} className="text-sm flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                          <span className="font-mono">{Number(d.amount).toFixed(2)}</span>
-                          <span className="text-text-muted">{d.payment_method ?? 'deposit'}</span>
-                          <span className="text-text-muted">{formatDate(d.paid_at)}</span>
-                          {d.reference && <span className="text-text-muted">({d.reference})</span>}
-                          <span className="text-text-muted text-xs">
-                            {d.applied_to_invoice_id != null
-                              ? (d.applied_to_invoice_number ? `Applied to invoice #${d.applied_to_invoice_number}` : 'Applied to invoice')
-                              : 'Will apply to next invoice'}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
+                    {deposits.length === 0 ? (
+                      <p className="text-sm text-text-muted">No deposits recorded.</p>
+                    ) : (
+                      <ul className="space-y-1.5">
+                        {deposits.map((d) => (
+                          <li key={d.id} className="text-sm flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                            <span className="font-mono">{Number(d.amount).toFixed(2)}</span>
+                            <span className="text-text-muted">{d.payment_method ?? 'deposit'}</span>
+                            <span className="text-text-muted">{formatDate(d.paid_at)}</span>
+                            {d.reference && <span className="text-text-muted">({d.reference})</span>}
+                            <span className="text-text-muted text-xs">
+                              {d.applied_to_invoice_id != null
+                                ? (d.applied_to_invoice_number ? `Applied to invoice #${d.applied_to_invoice_number}` : 'Applied to invoice')
+                                : 'Will apply to next invoice'}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
                 )}
               </>
@@ -1222,6 +1249,26 @@ const OrderDetailPage = () => {
                 { label: 'Tax', value: displayTotals.tax_amount.toFixed(2) },
                 { label: 'Shipping', value: displayTotals.shipping_amount.toFixed(2) },
                 { label: 'Total', value: displayTotals.total.toFixed(2), emphasis: true },
+                ...(!isNew && order?.type === 'order'
+                  ? (() => {
+                      const unapplied = deposits
+                        .filter((d) => d.applied_to_invoice_id == null)
+                        .reduce((s, d) => s + Number(d.amount), 0);
+                      const applied = deposits
+                        .filter((d) => d.applied_to_invoice_id != null)
+                        .reduce((s, d) => s + Number(d.amount), 0);
+                      const rows: { label: string; value: string; emphasis?: boolean }[] = [];
+                      if (unapplied > 0 || applied > 0 || deposits.length > 0) {
+                        rows.push({ label: 'Deposits', value: unapplied.toFixed(2) });
+                        rows.push({ label: 'Deposits applied', value: applied.toFixed(2) });
+                        rows.push({
+                          label: 'Net after deposits',
+                          value: Math.max(0, displayTotals.total - unapplied).toFixed(2),
+                        });
+                      }
+                      return rows;
+                    })()
+                  : []),
               ]}
             />
           </FormSection>
@@ -1302,9 +1349,12 @@ const OrderDetailPage = () => {
                     const data = await res.json().catch(() => ({}));
                     if (!res.ok) throw new Error(data.error || 'Failed to create purchase order');
                     setPoModalOpen(false);
+                    success('Purchase order created');
                     navigate(`/purchasing/${data.id}`);
                   } catch (e) {
-                    setError(e instanceof Error ? e.message : 'Failed to create purchase order');
+                    const msg = e instanceof Error ? e.message : 'Failed to create purchase order';
+                    setError(msg);
+                    toastError(msg);
                   } finally {
                     setCreatingPO(false);
                   }
@@ -1398,9 +1448,20 @@ const OrderDetailPage = () => {
                     const data = await res.json().catch(() => ({}));
                     if (!res.ok) throw new Error(data.error || 'Failed to add deposit');
                     setDepositModalOpen(false);
+                    if (data.applied_to_invoice_id != null) {
+                      success(
+                        data.applied_to_invoice_number
+                          ? `Deposit recorded — applied to invoice #${data.applied_to_invoice_number}`
+                          : 'Deposit recorded — applied to invoice'
+                      );
+                    } else {
+                      success('Deposit recorded');
+                    }
                     fetchDeposits(order.id);
                   } catch (e) {
-                    setDepositError(e instanceof Error ? e.message : 'Failed to add deposit');
+                    const msg = e instanceof Error ? e.message : 'Failed to add deposit';
+                    setDepositError(msg);
+                    toastError(msg);
                   } finally {
                     setSubmittingDeposit(false);
                   }

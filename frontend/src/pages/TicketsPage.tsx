@@ -7,6 +7,7 @@ import { formatDate } from '../utils/formatDate';
 import { ErrorBanner } from '../components/ErrorBanner';
 import ListCardRow from '../components/ListCardRow';
 import ResponsiveEntityList from '../components/ResponsiveEntityList';
+import ResizableTable from '../components/ResizableTable';
 import { ListPageToolbar } from '../components/MobilePageTitle';
 
 const API_BASE = `${apiBase}/api/app/tickets`;
@@ -156,19 +157,20 @@ const TicketsPage = () => {
           />
         )}
         renderTable={() => (
-          <table>
-            <thead>
-              <tr>
-                <th className="col-id">ID</th>
-                <th className="col-date">Created</th>
-                <th>Subject</th>
-                <th>Customer</th>
-                <th className="col-status">Category</th>
-                <th className="col-id">Prio</th>
-                <th className="col-status">Status</th>
-                <th>Linked orders</th>
-              </tr>
-            </thead>
+          <ResizableTable
+            tableId="tickets"
+            embedded
+            columns={[
+              { key: 'id', header: 'ID', className: 'col-id' },
+              { key: 'created', header: 'Created', className: 'col-date' },
+              { key: 'subject', header: 'Subject' },
+              { key: 'customer', header: 'Customer' },
+              { key: 'category', header: 'Category', className: 'col-status' },
+              { key: 'prio', header: 'Prio', className: 'col-id' },
+              { key: 'status', header: 'Status', className: 'col-status' },
+              { key: 'linked', header: 'Linked orders' },
+            ]}
+          >
             <tbody className="text-text">
               {filteredTickets.map((t) => {
                 const linked = linkedOrdersByTicket.get(t.id);
@@ -192,7 +194,7 @@ const TicketsPage = () => {
                 );
               })}
             </tbody>
-          </table>
+          </ResizableTable>
         )}
       />
     </div>

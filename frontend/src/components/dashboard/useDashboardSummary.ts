@@ -24,6 +24,11 @@ export interface DashboardSummary {
   openInvoices: number;
   accountsReceivable: number;
   openTickets: number;
+  depositsHeld?: number;
+  openPurchaseOrders?: number;
+  openPurchaseOrderItems?: number;
+  staleTickets?: number;
+  thisMonthRevenue?: number;
   revenueByMonth: RevenueMonth[];
   recentOrders: RecentOrder[];
 }
@@ -41,6 +46,10 @@ const defaultSummary: DashboardSummary = {
   openInvoices: 0,
   accountsReceivable: 0,
   openTickets: 0,
+  openPurchaseOrders: 0,
+  openPurchaseOrderItems: 0,
+  staleTickets: 0,
+  thisMonthRevenue: 0,
   revenueByMonth: [],
   recentOrders: [],
 };
